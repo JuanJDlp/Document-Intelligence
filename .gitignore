@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+*.egg-info/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+guia_proyecto_final.pdf
