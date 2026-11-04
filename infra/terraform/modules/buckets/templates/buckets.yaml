@@ -1,0 +1,93 @@
+# S3 buckets created by CloudFormation (ADR-035).
+# CloudFormation owns the bucket's intrinsic configuration: name, public access block, encryption, lifecycle.
+# Terraform owns the bucket policies (modules/bucket_policies, modules/frontend, modules/audit).
+AWSTemplateFormatVersion: "2010-09-09"
+Description: DocuProcess S3 buckets
+
+Parameters:
+  Prefix:
+    Type: String
+    Description: Name prefix, for example docuprocess-sandbox
+  AccountId:
+    Type: String
+    Description: AWS account ID, makes bucket names globally unique
+
+Resources:
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Prefix}-uploads-${AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Prefix}-artifacts-${AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Prefix}-frontend-${AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  AuditLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Prefix}-audit-logs-${AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-after-30-days
+            Status: Enabled
+            ExpirationInDays: 30
+
+Outputs:
+  UploadsBucketName:
+    Value: !Ref UploadsBucket
+  UploadsBucketArn:
+    Value: !GetAtt UploadsBucket.Arn
+  ArtifactsBucketName:
+    Value: !Ref ArtifactsBucket
+  ArtifactsBucketArn:
+    Value: !GetAtt ArtifactsBucket.Arn
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  FrontendBucketArn:
+    Value: !GetAtt FrontendBucket.Arn
+  AuditLogsBucketName:
+    Value: !Ref AuditLogsBucket
+  AuditLogsBucketArn:
+    Value: !GetAtt AuditLogsBucket.Arn

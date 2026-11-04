@@ -1,0 +1,93 @@
+#!/bin/bash
+# Bootstrap for API and worker instances (INF-UD-*). Idempotent: safe to re-run.
+set -euo pipefail
+exec >> /var/log/docuprocess-bootstrap.log 2>&1
+echo "bootstrap start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# INF-UD-01: system packages. Tesseract is the OCR provider in v1 (ADR-012).
+dnf install -y tar gzip tesseract tesseract-langpack-spa tesseract-langpack-eng
+
+# INF-UD-02: uv provisions Python 3.12 without depending on the AL2023 default Python.
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+export UV_PYTHON_INSTALL_DIR=/opt/python
+uv python install 3.12
+
+# INF-UD-05: non-secret configuration. The DB password is read from SSM at boot and never rendered here.
+install -d -m 0755 /etc/docuprocess
+DB_PASSWORD="$(aws ssm get-parameter --region "${region}" --name "${db_password_parameter}" --with-decryption --query Parameter.Value --output text)"
+umask 077
+cat > /etc/docuprocess/app.env <<ENV
+DOCUPROCESS_AWS_REGION=${region}
+DOCUPROCESS_DB_HOST=${db_host}
+DOCUPROCESS_DB_NAME=${db_name}
+DOCUPROCESS_DB_USER=${db_user}
+DOCUPROCESS_DB_PASSWORD=$DB_PASSWORD
+DOCUPROCESS_UPLOADS_BUCKET=${uploads_bucket}
+DOCUPROCESS_DOCUMENTS_TABLE=${documents_table}
+DOCUPROCESS_JOBS_TABLE=${jobs_table}
+DOCUPROCESS_PROCESSING_TOPIC_ARN=${processing_topic_arn}
+DOCUPROCESS_CORS_ORIGIN=${cors_origin}
+DOCUPROCESS_MAX_UPLOAD_BYTES=${max_upload_bytes}
+DOCUPROCESS_OCR_PROVIDER=${ocr_provider}
+ENV
+umask 022
+
+%{ if release_version != "" ~}
+# INF-UD-03: download the exact release version.
+install -d -m 0755 /opt/docuprocess/releases/${release_version}
+aws s3 cp "s3://${artifacts_bucket}/releases/${release_version}/docuprocess-${release_version}.tar.gz" /tmp/release.tar.gz
+tar -xzf /tmp/release.tar.gz -C /opt/docuprocess/releases/${release_version}
+ln -sfn /opt/docuprocess/releases/${release_version} /opt/docuprocess/current
+
+# INF-UD-04: virtualenv with the release packages.
+uv venv --python 3.12 /opt/docuprocess/current/.venv
+uv pip install --python /opt/docuprocess/current/.venv/bin/python \
+  /opt/docuprocess/current/packages/receipt_engine \
+  /opt/docuprocess/current/packages/worker \
+  /opt/docuprocess/current/packages/api
+
+# INF-UD-06: migrations take a MySQL advisory lock, so concurrent instances are safe.
+set -a; . /etc/docuprocess/app.env; set +a
+/opt/docuprocess/current/.venv/bin/python -m api.migrate
+
+# INF-UD-07: systemd units.
+id docuprocess >/dev/null 2>&1 || useradd --system --home /opt/docuprocess docuprocess
+cat > /etc/systemd/system/docuprocess-api.service <<UNIT
+[Unit]
+Description=DocuProcess API
+After=network-online.target
+
+[Service]
+User=docuprocess
+EnvironmentFile=/etc/docuprocess/app.env
+ExecStart=/opt/docuprocess/current/.venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+cat > /etc/systemd/system/docuprocess-worker.service <<UNIT
+[Unit]
+Description=DocuProcess worker
+After=network-online.target
+
+[Service]
+User=docuprocess
+EnvironmentFile=/etc/docuprocess/app.env
+ExecStart=/opt/docuprocess/current/.venv/bin/python -m worker.main
+Restart=always
+RestartSec=5
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now docuprocess-api docuprocess-worker
+echo "application started, release ${release_version}"
+%{ else ~}
+echo "no release_version set: infrastructure-only boot, application not started"
+%{ endif ~}
+
+echo "bootstrap done $(date -u +%Y-%m-%dT%H:%M:%SZ)"

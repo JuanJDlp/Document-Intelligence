@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Never commit the real file.
+#
+# instance_profile_name is discovered each lab session with the aws-sandbox skill:
+#   aws iam list-instance-profiles --query "InstanceProfiles[?contains(InstanceProfileName,'SsmRoleInstanceProfile')].InstanceProfileName" --output text
+
+instance_profile_name = "<discovered by skills/aws-sandbox>"
+
+# Empty until a release is published (see scripts/publish_release.sh).
+release_version = ""
+
+# Leave empty to skip email subscriptions. The recipient must confirm them.
+alert_email = ""
+
+asg_health_check_type = "EC2"
