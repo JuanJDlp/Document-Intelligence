@@ -165,7 +165,7 @@ Run the checklist in `specs/10-testing-and-acceptance.md` section 6 (`TST-E2E-01
 make destroy
 ```
 
-**(after implementation)** Prints the destroy plan and asks for approval. The S3 buckets are emptied and deleted because `force_destroy` is set for sandbox buckets.
+**(after implementation)** Empties the S3 buckets (`scripts/empty_buckets.sh`), then prints the destroy plan and asks for approval. The buckets live in a CloudFormation stack, which cannot delete non-empty buckets (`ADR-035`).
 
 **Expected:** `Destroy complete!`. Check the RDS console afterwards: the instance should be gone, and no snapshot is kept (`skip_final_snapshot = true`).
 

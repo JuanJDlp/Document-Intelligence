@@ -37,7 +37,7 @@ These are the course deliverables (brief, section 5). They are written for human
   - SNS email not received: confirm the subscription.
   - CloudFront returns stale content: invalidate `/*`.
   - Tesseract missing on the instance: check the bootstrap log; the dnf package name may differ (`ADR-012`).
-- **DLV-DEP-04** (active) Teardown section: `make destroy`, and the manual check that the CloudTrail bucket and the artifacts bucket are emptied if Terraform cannot delete them (`force_destroy` is set only for the sandbox buckets, see `INF-S3-*`).
+- **DLV-DEP-04** (active) Teardown section: `make destroy`, and the manual check that the CloudTrail bucket and the artifacts bucket are emptied if Terraform cannot delete them (the buckets are emptied first by `scripts/empty_buckets.sh`, see `ADR-035`).
 
 ## 5. Risks and exceptions (`DLV-RISK-*`)
 

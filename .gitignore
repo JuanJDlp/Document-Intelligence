@@ -27,3 +27,5 @@ crash.log
 .idea/
 .vscode/
 guia_proyecto_final.pdf
+*.tfplan
+.plan.tfplan

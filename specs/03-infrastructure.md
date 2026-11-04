@@ -60,7 +60,7 @@ Constraints in `02-aws-sandbox-constraints.md` apply to every resource here. If 
 - **INF-CDN-04** (active) Frontend assets are uploaded by `scripts/deploy_frontend.sh` (`ADR-007`). Terraform does not upload files.
 
 ### 5.2 Uploads (`modules/storage`)
-- **INF-S3-01** (active) Bucket `uploads` (private, public access blocked, SSE-S3 default encryption, versioning disabled).
+- **INF-S3-01** (active) Bucket `uploads` (private, public access blocked, SSE-S3 default encryption, versioning disabled). Created by CloudFormation (`ADR-035`); its policy is managed by Terraform (`INF-RPOL-02`).
 - **INF-S3-02** (active) Object keys: `uploads/{user_id}/{document_id}/{safe_filename}`. Filenames are sanitized (see `API-DOC-05`).
 
 ### 5.3 Artifacts (`modules/storage`)
@@ -191,7 +191,7 @@ Outputs MUST NOT include the DB password.
 ## 16. State and teardown
 
 - **INF-STATE-01** (active) Terraform state is local (`infra/terraform/terraform.tfstate`), git-ignored, and never copied into the repository. A remote backend is out of scope because the sandbox would need an extra bucket and lock table; the operator keeps the state file for the duration of the course.
-- **INF-STATE-02** (active) S3 buckets in this stack (`frontend-assets`, `uploads`, `artifacts`, `audit-logs`) set `force_destroy = true` so that `make destroy` works on non-empty buckets. Sandbox data is disposable.
+- **INF-STATE-02** (active) The four S3 buckets are created by a CloudFormation stack (`ADR-035`). `make tf-destroy` empties them with `scripts/empty_buckets.sh` before destroying the stack. Sandbox data is disposable.
 - **INF-STATE-03** (active) `make destroy` prints the destroy plan first and requires explicit approval (`TST-MK-13`).
 
 ## 17. Resource policies for the instance role
