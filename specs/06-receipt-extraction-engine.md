@@ -159,7 +159,7 @@ The extractor maps provider output to semantic fields. Every field has a list of
 
 - **ENG-CHK-08** (active) Totals check: if `total` and `subtotal` are present, then `total` MUST equal `subtotal + tax_amount − discount` within a tolerance of `0.01`. `tax_amount` and `discount` default to `0.00` for this check only when they are missing. Mismatch → warning `TOTAL_MISMATCH` (both values kept).
 - **ENG-CHK-09** (active) Line item check: for each item with `quantity`, `unit_price`, and `line_total` all present, `quantity × unit_price` MUST equal `line_total` within `0.01`. Mismatch → warning `LINE_ITEM_MISMATCH` with the item index.
-- **ENG-CHK-10** (active) Line items sum check: if all items have `line_total` and `subtotal` is present, the sum of `line_total` MUST equal `subtotal` within `0.01`. Mismatch → warning `LINE_ITEMS_SUM_MISMATCH`.
+- **ENG-CHK-10** (active) Line items sum check: if all items have `line_total` and `subtotal` is present, the sum of `line_total` MUST equal `subtotal` within `0.01`. Mismatch → warning `LINE_ITEMS_SUM_MISMATCH`. Worker persistence may additionally add LINE_ITEMS_TRUNCATED (WRK-PER-04).
 - **ENG-CHK-11** (active) Arithmetic checks never change values. They only add warnings.
 
 ### 8.4 Validation outcome
@@ -237,14 +237,14 @@ The extractor maps provider output to semantic fields. Every field has a list of
 - **ENG-OUT-02** (active) Money fields are strings with two decimals. Dates are `YYYY-MM-DD`. Timestamps are not in the result; `processing_ms` is the only time value.
 - **ENG-OUT-03** (active) `line_items` entries: `{ "description": str|null, "quantity": str|null, "unit_price": str|null, "line_total": str|null }`. Quantities are decimal strings.
 - **ENG-OUT-04** (active) With `include_debug_details=True` only, the result also contains `raw_text` (concatenated lines in reading order) and, inside `validation`, a `field_sources` object mapping field names to source text. Without the flag, these keys are absent (not `null`).
-- **ENG-OUT-05** (active) `warnings` entries: `{ "code": str, "field": str|null, "message": str }`. Warning codes are a closed set: `MIME_TYPE_MISMATCH`, `AMBIGUOUS_AMOUNT_FORMAT`, `DATE_FORMAT_ASSUMED`, `CURRENCY_INFERRED`, `FIELD_MISSING`, `FIELD_AMBIGUOUS`, `FIELD_INVALID`, `NEGATIVE_DISCOUNT_NORMALIZED`, `DOCUMENT_TYPE_UNKNOWN`, `NIT_CHECK_DIGIT_MISMATCH`, `TOTAL_MISMATCH`, `LINE_ITEM_MISMATCH`, `LINE_ITEMS_SUM_MISMATCH`.
+- **ENG-OUT-05** (active) `warnings` entries: `{ "code": str, "field": str|null, "message": str }`. Warning codes are a closed set: `MIME_TYPE_MISMATCH`, `AMBIGUOUS_AMOUNT_FORMAT`, `DATE_FORMAT_ASSUMED`, `CURRENCY_INFERRED`, `FIELD_MISSING`, `FIELD_AMBIGUOUS`, `FIELD_INVALID`, `NEGATIVE_DISCOUNT_NORMALIZED`, `DOCUMENT_TYPE_UNKNOWN`, `NIT_CHECK_DIGIT_MISMATCH`, `TOTAL_MISMATCH`, `LINE_ITEM_MISMATCH`, `LINE_ITEMS_SUM_MISMATCH`. Worker persistence may additionally add LINE_ITEMS_TRUNCATED (WRK-PER-04).
 - **ENG-OUT-06** (active) `confidence.fields` contains an entry only for non-null extracted scalar fields. Values are floats in `[0.0, 1.0]` rounded to two decimals. A field's confidence is the minimum confidence of the OCR lines or structured fields it was derived from. Normalization does not change confidence.
 - **ENG-OUT-07** (active) `confidence.overall` is the arithmetic mean of `confidence.fields` values, rounded to two decimals; `null` when there are no fields. It is never a model guess.
 - **ENG-OUT-08** (active) `metadata.provider` is the OCR provider `name`. `metadata.engine_version` comes from the package version. `processing_ms` is measured with a monotonic clock.
 
 ## 12. Configuration and logging
 
-- **ENG-CFG-01** (active) `EngineSettings` fields and defaults: `max_document_bytes=5242880`, `max_pdf_pages=1`, `max_image_dimension=10000`, `ocr_timeout_seconds=60`, `default_locale="es-CO"`, `dollar_sign_currency="COP"`, `supported_currencies=("COP","USD","EUR","MXN","PEN","CLP","ARS")`, `ocr_provider="textract"` (informational; the instance is injected).
+- **ENG-CFG-01** (active) `EngineSettings` fields and defaults: `max_document_bytes=5242880`, `max_pdf_pages=1`, `max_image_dimension=10000`, `ocr_timeout_seconds=60`, `default_locale="es-CO"`, `dollar_sign_currency="COP"`, `supported_currencies=("COP","USD","EUR","MXN","PEN","CLP","ARS")`, `ocr_provider="tesseract"` (informational; the instance is injected).
 - **ENG-LOG-01** (active) The engine logs with the `logging` module at these points only: `document.validated` (type, page count, size bucket), `ocr.completed` (provider, line count, duration), `extraction.completed` (status, error code, warning codes, duration). Each log line includes `document_id`.
 - **ENG-LOG-02** (active) The engine MUST NOT log: raw text, line text, field values, amounts, NIT, names, dates, currency values, file names, or byte contents.
 - **ENG-LOG-03** (active) Exceptions raised by providers are logged with their class and code only (never their payloads).
@@ -269,9 +269,9 @@ The extractor maps provider output to semantic fields. Every field has a list of
 
 ## 14. Samples and tests
 
-- **ENG-TST-01** (active) `samples/receipts/` contains synthetic documents only. Each sample has an expected JSON file `<name>.expected.json` with the exact expected output of the engine when run with the recorded provider output `<name>.ocr.json`. Expected outputs are written by hand from the sample content, never generated from the engine itself.
+- **ENG-TST-01** (active) `samples/receipts/` contains synthetic documents only. Each sample has an expected JSON file `<name>.expected.json` with the expected stable contract projection (excluding timing and provider variability) of the engine when run with the recorded provider output `<name>.ocr.json`. Expected outputs are written by hand from the sample content, never generated from the engine itself.
 - **ENG-TST-02** (active) Unit tests cover each requirement group: `VAL` (every error reason), `PROV` (fake transient vs permanent), `EXT` (structured-first, ambiguity), `NRM` (money formats incl. `1.234.567,89`, `119.000`, `119,5`; dates; currency; NIT check digit), `CHK` (each warning code), `STS` (each status), `OUT` (shape, absent debug keys), `LOG` (no sensitive content in captured logs).
-- **ENG-TST-03** (active) A golden test runs the full engine on each sample with its recorded OCR output and compares to `expected.json`.
+- **ENG-TST-03** (active) A golden test runs the full engine on each sample with its recorded OCR output and compares the documented projection to `expected.json`.
 - **ENG-TST-04** (active) A test asserts that `receipt_engine` imports no AWS or web module (`TST-CON-02`).
 - **ENG-TST-05** (active) Tests run without network access and without AWS credentials.
 

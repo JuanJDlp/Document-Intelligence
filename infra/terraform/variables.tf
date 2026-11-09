@@ -78,9 +78,9 @@ variable "asg_max_size" {
 }
 
 variable "asg_health_check_type" {
-  description = "ASG health check type. Use EC2 until a release is deployed, then ELB (INF-ASG-03)."
+  description = "Application-release health checks (ELB). Empty releases always use EC2 checks."
   type        = string
-  default     = "EC2"
+  default     = "ELB"
 
   validation {
     condition     = contains(["EC2", "ELB"], var.asg_health_check_type)

@@ -83,7 +83,7 @@ resource "aws_dynamodb_resource_policy" "documents" {
       Principal = { AWS = var.instance_role_arn }
       Action = [
         "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem",
-        "dynamodb:Query", "dynamodb:DescribeTable",
+        "dynamodb:Query", "dynamodb:DescribeTable", "dynamodb:Scan",
       ]
       Resource = [
         aws_dynamodb_table.documents.arn,

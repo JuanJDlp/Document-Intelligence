@@ -93,7 +93,7 @@ module "compute" {
   target_group_arns     = [module.alb.target_group_arn]
   min_size              = var.asg_min_size
   max_size              = var.asg_max_size
-  health_check_type     = var.asg_health_check_type
+  health_check_type     = var.release_version == "" ? "EC2" : var.asg_health_check_type
 
   user_data = templatefile("${path.module}/templates/userdata.sh.tftpl", {
     region                = var.region

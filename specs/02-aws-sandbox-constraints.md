@@ -14,7 +14,7 @@ The lab overview is the authoritative list of what the sandbox tolerates. It is 
 | RDS | `db.t2`/`db.t3` from `db.t.micro` to `db.t.medium`; Single AZ only ("Do not create a standby instance"); storage `gp2` up to 100 GB; engines Aurora, MySQL, PostgreSQL, MariaDB; On-Demand | `db.t3.micro`, MySQL 8.0, Single-AZ, 20 GB (`CON-RDS-*`) |
 | IAM | **Read access** only; List access | No IAM writes (`CON-IAM-01`). Terraform makes no IAM calls (`CON-IAM-02`). |
 | EC2 Auto Scaling | Allowed | ASG with target tracking (`INF-ASG-*`) |
-| CloudFormation | Allowed | Not used; Terraform chosen (`ADR-001`) |
+| CloudFormation | Allowed | Bucket creation only, orchestrated by Terraform (`ADR-001`) |
 | CloudWatch | Allowed | Alarms and dashboard (`INF-MON-*`) |
 | Systems Manager Session Manager | Allowed; requires the SSM instance role attached to the instance | Operator access, no SSH (`CON-EC2-05`). Profile name discovered per session (`CON-IAM-03`). |
 | SNS | Allowed | Processing and ops topics (`INF-SNS-*`) |
@@ -83,7 +83,7 @@ Where the two sources differ, the more restrictive rule applies until the differ
 
 ### 1.6 Infrastructure as Code
 
-- **CON-IAC-01** (active) Deployments MUST be automated with **Terraform** (chosen; see `ADR-001`). CloudFormation is not used.
+- **CON-IAC-01** (active) Deployments MUST be automated with **Terraform** (chosen; see `ADR-001`). CloudFormation creates buckets through Terraform (ADR-035).
 - **CON-IAC-02** (active) Terraform MUST NOT perform IAM reads or writes (see section 1.1).
 
 ## 2. Services we plan to use (allowed by the brief)

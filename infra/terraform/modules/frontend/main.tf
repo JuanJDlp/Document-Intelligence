@@ -34,21 +34,23 @@ resource "aws_cloudfront_distribution" "this" {
   }
 
   default_cache_behavior {
-    target_origin_id       = "frontend-s3"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
-    # Managed-CachingOptimized
-    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    target_origin_id           = "frontend-s3"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    # Managed-CachingDisabled honors the no-cache deployment contract
+    cache_policy_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
   }
 
   ordered_cache_behavior {
-    path_pattern           = "/api/*"
-    target_origin_id       = "api-alb"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods         = ["GET", "HEAD"]
+    path_pattern               = "/api/*"
+    target_origin_id           = "api-alb"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods             = ["GET", "HEAD"]
     # Managed-CachingDisabled and Managed-AllViewerExceptHostHeader
     cache_policy_id          = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
     origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
@@ -84,4 +86,21 @@ resource "aws_s3_bucket_policy" "frontend" {
     }]
   })
 
+}
+
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name = "${var.name}-security-headers"
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'"
+      override                = true
+    }
+    content_type_options {
+      override = true
+    }
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+  }
 }

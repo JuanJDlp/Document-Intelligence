@@ -1,0 +1,10 @@
+[project]
+name = "docuprocess-api"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = ["receipt-engine==1.0.0", "fastapi==0.115.12", "SQLAlchemy==2.0.40", "PyMySQL==1.1.1", "argon2-cffi==23.1.0", "python-multipart==0.0.20", "uvicorn==0.34.2", "boto3==1.38.5"]
+[build-system]
+requires = ["setuptools==78.1.0"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools.package-data]
+api = ["migrations/*.sql"]

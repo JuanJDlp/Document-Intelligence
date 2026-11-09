@@ -1,0 +1,17 @@
+{
+  "status": "completed",
+  "fields": {
+    "merchant_name": "SYNTHETIC MARKET",
+    "merchant_tax_id": "900123456-8",
+    "document_number": "INV-001",
+    "issue_date": "2026-01-15",
+    "subtotal": "100000.00",
+    "tax_amount": "19000.00",
+    "total": "119000.00",
+    "currency": "COP",
+    "payment_method": "cash"
+  },
+  "warnings": [
+    "AMBIGUOUS_AMOUNT_FORMAT"
+  ]
+}

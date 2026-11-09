@@ -11,4 +11,4 @@ release_version = ""
 # Leave empty to skip email subscriptions. The recipient must confirm them.
 alert_email = ""
 
-asg_health_check_type = "EC2"
+asg_health_check_type = "ELB"

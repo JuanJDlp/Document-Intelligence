@@ -1,0 +1,7 @@
+{
+  "status": "failed",
+  "reason": "NEGATIVE_TOTAL",
+  "fields": {
+    "total": null
+  }
+}

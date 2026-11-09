@@ -1,10 +1,10 @@
 # Architecture
 
-DocuProcess Cloud is a web platform where users upload receipts and invoices. Processing runs asynchronously on EC2. The system is deployed to the AWS Academy Sandbox in `us-east-1`.
+DocuProcess Cloud is a web platform where users upload receipts and invoices. Processing runs asynchronously on EC2. The target deployment is the AWS Academy Sandbox in `us-east-1`.
 
 > **Status:** This document describes the designed architecture. After the first deployment, re-check every address and name against `terraform output` (see `deployment-guide.md`).
 
-## 1. Diagram: deployed topology
+## 1. Diagram: target topology
 
 ```mermaid
 flowchart TB

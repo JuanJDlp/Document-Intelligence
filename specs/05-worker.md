@@ -33,10 +33,7 @@ PENDING ─────────────► RUNNING ── engine ok (par
 ## 3. Claiming
 
 - **WRK-CLM-01** (active) Polling query: GSI `gsi_status_available` with partition key `status` and sort key `available_at`. Two queries per poll: `status = PENDING` and `available_at <= now`; `status = RUNNING` and `available_at <= now` (expired leases). Limit 10 each.
-- **WRK-CLM-02** (active) Claim is a single `UpdateItem` with condition:
-  - for `PENDING`: `status = :pending AND available_at <= :now`;
-  - for an expired lease: `status = :running AND available_at <= :now`.
-  On success it sets `status = RUNNING`, `lease_owner = <worker_id>`, `attempts = attempts + 1`, `available_at = now + lease_seconds`, `claimed_at = now`, `updated_at = now`.
+- **WRK-CLM-02** (active) Claim uses a conditional job Put inside a TransactWriteItems request with the document mirror (ADR-036). It verifies the observed status, available_at and attempts, plus lease_owner for RUNNING; the observed available_at must already be due. On success it sets status=RUNNING, the new worker owner, attempts+1, available_at=now+lease_seconds, claimed_at=now and updated_at=now. A changed observation fails atomically.
 - **WRK-CLM-03** (active) If the conditional write fails, the worker moves on to the next candidate. No retry loop on the same item.
 - **WRK-CLM-04** (active) `lease_seconds` default `300`. The engine's total processing time MUST stay below the lease. Enforced by a per-job deadline of `120` seconds (`WRK-PRC-03`).
 - **WRK-CLM-05** (active) An expired lease with `attempts >= max_attempts` is not reclaimed. The worker marks it `FAILED` with `last_error_code = WORKER_LEASE_EXPIRED`. This is done by the same worker that finds it, using a conditional write.
@@ -47,7 +44,7 @@ PENDING ─────────────► RUNNING ── engine ok (par
 - **WRK-PRC-01** (active) The worker loads the `documents` item for the job's `document_id`. If it does not exist, the job is `FAILED` with `last_error_code = DOCUMENT_NOT_FOUND` (permanent).
 - **WRK-PRC-02** (active) The worker reads the S3 object with a size guard: `head_object` first; if `ContentLength > max_upload_bytes`, the job is `FAILED` with `INVALID_DOCUMENT` (permanent). Otherwise `get_object` and read the bytes.
 - **WRK-PRC-03** (active) The engine is called with a deadline of `120` seconds. A timeout is a retryable failure (`WORKER_TIMEOUT`).
-- **WRK-PRC-04** (active) The engine receives a `DocumentInput` (`ENG-API-02`) built by the worker from the S3 bytes, the declared MIME type stored on the `documents` item, the filename, and the `document_id` for correlation. The worker never passes the S3 key, bucket name, or user identifier to the engine.
+- **WRK-PRC-04** (active) The engine receives a `DocumentInput` (`ENG-API-02`) built by the worker from the S3 bytes, the declared MIME type stored on the `documents` item, and the `document_id` for correlation. Filename is optional in DocumentInput and is omitted at the worker subprocess boundary; type validation uses bytes only (ADR-037). The worker never passes the S3 key, bucket name, or user identifier to the engine.
 - **WRK-PRC-05** (active) Mapping engine results to job state:
 
   | Engine `status` | Engine `error.code` | `retryable` | Job result |
@@ -62,17 +59,16 @@ PENDING ─────────────► RUNNING ── engine ok (par
 
 ## 5. Persistence
 
-- **WRK-PER-01** (active) Order of writes for a finished job:
-  1. Update `documents` item: `processing_status`, `result` (engine result without `raw_text`), `updated_at`.
-  2. Conditionally update `jobs` item to the terminal status, with `lease_owner = <me>` and `status = RUNNING`.
-- **WRK-PER-02** (active) If step 2's condition fails (lease was taken by another worker), the worker discards its result and logs `lease_lost` with the job ID. It does not publish a notification.
-- **WRK-PER-03** (active) `documents.processing_status` mirrors the job status at all times so the API can read one item.
-- **WRK-PER-04** (active) The engine result stored in DynamoDB MUST be under 100 KB. If it would exceed that, `line_items` is truncated to the first 50 items and a warning `LINE_ITEMS_TRUNCATED` is added.
+- **WRK-PER-01** (active) Job and document state transitions MUST use one DynamoDB transaction (ADR-036). The job update verifies the observed state, attempts, available_at and lease_owner. Completion requires an unexpired lease.
+- **WRK-PER-02** (active) A lost conditional race changes neither item and publishes no notification.
+- **WRK-PER-03** (active) The document mirror changes atomically with the job for claim, retry, expiration and terminal transitions.
+
+- **WRK-PER-04** (active) The engine result stored in DynamoDB MUST be under 100 KB. If it would exceed that, `line_items` is truncated to the first 50 items and a warning `LINE_ITEMS_TRUNCATED` is added. If the serialized result still exceeds 100,000 bytes, the job ends FAILED with WORKER_RESULT_TOO_LARGE and the oversized result is not persisted.
 - **WRK-PER-05** (active) Raw OCR text is never persisted by the worker (`ENG-OUT-04`).
 
 ## 6. Notifications
 
-- **WRK-NOT-01** (active) After a terminal status is persisted, the worker publishes one SNS message to `docuprocess-sandbox-processing-events`.
+- **WRK-NOT-01** (active) After a terminal status is persisted, the worker attempts to publish an SNS message to `docuprocess-sandbox-processing-events`.
 - **WRK-NOT-02** (active) Message body (JSON string) contains only:
   ```json
   { "event": "document.processing.finished", "document_id": "…", "job_id": "…", "status": "COMPLETED", "occurred_at": "2026-11-03T21:04:05Z" }
@@ -123,3 +119,5 @@ Each adapter MUST be injectable so that `tests/` can replace it with `moto` or w
 
 - **WRK-ACC-01** (active) Unit tests with `moto` (or in-memory fakes) cover: claim success, claim race lost, expired lease reclaim, `max_attempts` exhaustion, retryable vs permanent mapping, lease lost on persist, SNS retry and final failure.
 - **WRK-ACC-02** (active) End-to-end in the sandbox: upload one sample receipt, the job reaches a terminal state within 2 minutes, and exactly one SNS message is published.
+
+Notification limitation: SNS publication follows the terminal transaction; crash recovery and exactly-once email delivery are not guaranteed (ADR-036).

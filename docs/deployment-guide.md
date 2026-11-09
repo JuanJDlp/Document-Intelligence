@@ -1,251 +1,161 @@
 # Deployment guide
 
-This guide deploys DocuProcess Cloud from an empty AWS Academy Sandbox to a working system. Each step says what to run, what you should see, and what to do if it fails.
+The local application is implemented. This guide describes the AWS deployment procedure; it is not evidence that the current sandbox is deployed. Complete the acceptance checklist in `specs/10-testing-and-acceptance.md` and record actual outcomes.
 
-> **Status:** Draft. The Makefile targets and scripts are specified in `specs/10-testing-and-acceptance.md` but not implemented yet. Commands marked **(after implementation)** do not exist until the code is written. Items marked **(verify)** depend on open questions in `specs/open-questions.md`.
+## 1. Prepare Ubuntu/WSL
 
-## 0. Prerequisites
-
-| Item | Check |
-|---|---|
-| AWS Academy Sandbox started, region `us-east-1` | Lab console shows the region |
-| CLI credentials exported in your shell (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`) | `aws sts get-caller-identity` returns an ARN |
-| Instance profile name discovered by the `aws-sandbox` skill | `aws iam list-instance-profiles` shows a name containing `SsmRoleInstanceProfile` |
-| Terraform 1.6 or newer | `terraform version` |
-| Python 3.12 and `uv` | `python3.12 --version`, `uv --version` |
-| `make` | `make --version` |
-| An email address you can read, for SNS confirmation | You will receive one confirmation email per topic |
-
-Sandbox rules that affect this guide are summarized in `specs/02-aws-sandbox-constraints.md`. Do not change instance types or database classes outside the allowed ranges.
-
-## 1. Clone and configure
+Use Python 3.12, uv, make, Terraform 1.6+, Git, AWS CLI and Tesseract with Spanish/English data. Run all project commands from the repository root in Ubuntu 24.04.
 
 ```sh
-git clone <repository-url> docuprocess-cloud
-cd docuprocess-cloud
-cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
-```
-
-Edit `infra/terraform/terraform.tfvars` and set at least:
-
-```hcl
-alert_email             = "you@example.com"
-release_version         = "1.0.0"
-instance_profile_name   = "<discovered by skills/aws-sandbox>"
-```
-
-Do not commit this file. It is git-ignored.
-
-**Expected:** `terraform.tfvars` exists and is not tracked by Git (`git status` does not list it).
-
-## 2. Install dependencies and run local checks
-
-```sh
+sudo apt-get update
+sudo apt-get install -y make python3-venv tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng
 make setup
 make lint
 make typecheck
 make test
+make test-ocr
+make tf-validate
+make package VERSION=1.0.0
 ```
 
-**(after implementation)**
+Expected: every command exits 0. Terraform initialization downloads providers but does not create AWS resources. The release archive and OpenAPI document are generated locally.
 
-**Expected:** all four commands exit with status 0. If `make test` fails, do not deploy. Fix the failing tests first.
+`make demo` starts the portal at http://127.0.0.1:8000 with temporary SQLite and mocked S3/DynamoDB/SNS. It uses real Tesseract. This is local functional evidence only.
 
-## 3. Validate the Terraform configuration
+## 2. Verify the sandbox and recover state
+
+Start the AWS Academy lab. Update the temporary credentials in the WSL user's `~/.aws/credentials`, using the intended profile; never place credentials in the repository or paste them into evidence. Set the CLI region to `us-east-1`.
 
 ```sh
-make tf-validate
+bash scripts/aws_sandbox_check.sh
+aws iam list-instance-profiles --query "InstanceProfiles[?contains(InstanceProfileName, 'SsmRoleInstanceProfile')].InstanceProfileName" --output text
+terraform -chdir=infra/terraform state list
 ```
 
-**(after implementation)** This runs `terraform init -backend=false` and `terraform validate`. It makes no AWS calls.
+If the session is expired, stop AWS checks until credentials are renewed. The profile changes between sessions. If no local state is available, inspect the existing EC2/ASG, RDS, DynamoDB, S3, CloudFront and CloudFormation resources using the read-only checks and console. Recover the state backup or plan imports before creating anything with matching names. Never delete or recreate resources merely because a state file is missing.
 
-**Expected:** `Success! The configuration is valid.`
+Terraform state contains the generated database password. Keep it private and backed up outside Git.
 
-## 4. Review the plan
+## 3. Configure and review the plan
+
+```sh
+cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
+```
+
+Set `instance_profile_name` to the discovered value and `alert_email` to the recipient for processing/operational notifications. Leave `release_version = ""` until publication. Keep `asg_health_check_type = "ELB"`; infrastructure-only startup explicitly uses EC2 health checks until a release is configured.
 
 ```sh
 make tf-plan
 ```
 
-**(after implementation)** This is read-only. Read the output and check:
-- No IAM role, policy, or instance profile is created (`CON-IAM-01`).
-- No Lambda, Route53, KMS key, or key pair is created (`02` section 0).
-- RDS shows `multi_az = false` and `publicly_accessible = false`.
-- ASG shows min 2, max 4.
+Review the plan before approval: no IAM creation, Lambda, custom DNS/certificates, public RDS or SSH; two private application instances, Single-AZ RDS, and the documented sandbox instance/storage limits. A saved plan is sensitive because it may contain state values.
 
-If the plan includes a forbidden resource, stop. Run `scripts/check_constraints.sh` and fix the Terraform before going on.
+## 4. Bootstrap buckets and publish the release
 
-## 5. Create the artifacts bucket
+The buckets are owned by the `buckets` module through CloudFormation (ADR-035). The artifact must exist before application instances start.
 
-The EC2 instances download the release from the artifacts bucket at boot, so the bucket must exist before the Auto Scaling Group.
+After explicit approval for bucket creation:
 
 ```sh
 make bootstrap-artifacts
 ```
 
-**(after implementation)** This applies only the storage module (`terraform apply -target=module.storage`). It requires your approval, because it creates billable resources.
-
-**Expected:** the output shows the artifacts bucket name, for example `docuprocess-sandbox-artifacts-<account-id>`.
-
-## 6. Build and publish the release
+After explicit approval for uploading the prepared artifact:
 
 ```sh
-make package
-make publish
+make publish VERSION=1.0.0
 ```
 
-**(after implementation)** `make package` builds `dist/docuprocess-<version>.tar.gz` and `docs/openapi.json`. `make publish` uploads the tarball to `releases/<version>/` in the artifacts bucket.
+Expected: the artifact is at `releases/1.0.0/docuprocess-1.0.0.tar.gz` in the artifacts bucket. A bucket-only targeted apply is initial preparation, not a complete infrastructure deployment.
 
-**Expected:** `aws s3 ls s3://<artifacts-bucket>/releases/<version>/` lists the tarball.
+## 5. Deploy the application stack
 
-## 7. Deploy the full stack
+After reviewing and approving the full release plan:
 
 ```sh
-make deploy
+make deploy VERSION=1.0.0
 ```
 
-**(after implementation)** Runs `terraform apply` with the release version. It takes several minutes, mostly RDS and the CloudFront distribution. It requires your approval.
+The target creates a saved plan with the published version and ELB health checks, then applies it. Set the same version in the private tfvars file afterwards so future plans do not revert to infrastructure-only startup. New releases must use new version identifiers; the launch-template change triggers a rolling instance refresh.
 
-**Expected:** Terraform ends with `Apply complete!` and prints the outputs (`alb_dns_name`, `cloudfront_domain_name`, and others). The database password is never printed.
+At boot each instance downloads the release, installs locked runtime dependencies and the three application packages, verifies MySQL TLS against the RDS CA, and runs forward-only migrations. MySQL `GET_LOCK` serializes migration runners. Systemd then starts the API and worker. RDS remains private.
 
-## 8. Wait for healthy instances
-
-Open the EC2 console and the target group `docuprocess-sandbox-api`, or run:
+Find the target-group ARN in the ALB console, then:
 
 ```sh
-aws elbv2 describe-target-health --target-group-arn <arn>
+aws elbv2 describe-target-health --target-group-arn <target-group-arn>
 ```
 
-**Expected:** two targets with state `healthy`. Allow 5 to 10 minutes after apply: instances boot, install the release, run migrations, and start the services.
+Expected: two targets become healthy on `/api/v1/health`. Terraform completion alone does not establish application health. Allow time for RDS provisioning, package installation and health checks.
 
-If targets stay `unhealthy`, see troubleshooting **T1** below.
+## 6. Confirm SNS and deploy the frontend
 
-## 9. Confirm the SNS subscriptions
+Confirm both SNS subscription emails manually. A successful SNS publish does not prove that email delivery is confirmed.
 
-Two confirmation emails arrive at `alert_email`: one for the processing topic and one for the alarms topic. Open each email and click **Confirm subscription**.
-
-**Expected:** `aws sns list-subscriptions-by-topic --topic-arn <arn>` shows `Confirmed` for both. Notifications are not delivered until you confirm.
-
-## 10. Deploy the frontend
+After explicit approval for uploading frontend assets and creating a CloudFront invalidation:
 
 ```sh
 make deploy-frontend
+terraform -chdir=infra/terraform output -raw cloudfront_domain_name
 ```
 
-**(after implementation)** Uploads `app/frontend/` to the frontend bucket and creates a CloudFront invalidation for `/*`. It requires your approval.
+Open the resulting HTTPS domain. Static pages and `/api/v1` share that origin; CloudFront forwards API requests to the ALB and disables API caching. Security headers are delivered by CloudFront.
 
-**Expected:** the script prints the CloudFront URL. Open it in a browser. You should see the login page.
-
-The frontend uses the relative path `/api/v1`, so no URL needs to be set in the code (`ADR-030`).
-
-## 11. Run the smoke test
+## 7. Run live acceptance
 
 ```sh
 SMOKE_BASE_URL=https://<cloudfront-domain> make smoke
 ```
 
-**(after implementation)** The smoke test registers a random user, logs in, uploads a synthetic receipt, waits for a terminal status, checks the result fields, and logs out. It prints only step names and HTTP status codes.
+Expected: health/register/login/upload/poll/logout return the expected HTTP statuses and the script exits 0. It prints no tokens or response bodies. It creates a synthetic account and document in the deployed system.
 
-**Expected:** `SMOKE OK` and exit code 0. A job that ends `PARTIAL` or `COMPLETED` is success. `FAILED` on the sample receipt is a failure to investigate.
+Repeat through the browser; verify the S3 object, terminal document/job in DynamoDB, and SNS email. The synthetic receipt total should be COP 119000.00. Verify rejection of oversized, encrypted, multi-page and renamed invalid files, owner isolation and logout.
 
-## 12. Manual checks
+Complete TST-E2E-01..15 in the testing specification: two healthy targets, SSM without SSH, effective S3/DynamoDB/SNS permissions from an instance, alarm delivery, CloudTrail or its documented restriction, controlled scale-out and a second plan with no unintended changes. After an approved instance refresh/replacement, confirm previously registered users and documents remain available. These live checks remain pending until observed.
 
-Run the checklist in `specs/10-testing-and-acceptance.md` section 6 (`TST-E2E-01` to `TST-E2E-15`) and record the results. The items that need your eyes:
+## 8. Optional first administrator
 
-1. Register and log in through the browser.
-2. Upload a PDF receipt. Watch the status change on the detail page.
-3. Receive the SNS email for that document.
-4. Upload a 6 MB file. Expect a `413` error message.
-5. Open an SSM session to an instance: `aws ssm start-session --target <instance-id>`. Confirm there is no SSH port.
-6. Run `terraform apply` again. Expect **no changes**.
+Register the intended account normally. In an authorized SSM shell on an application instance, promote that existing account through the migration runner:
 
-## 13. Teardown
+```sh
+sudo bash
+set -a
+. /etc/docuprocess/app.env
+set +a
+export DOCUPROCESS_BOOTSTRAP_ADMIN_EMAIL='<registered-email>'
+/opt/docuprocess/current/.venv/bin/python -m api.migrate
+unset DOCUPROCESS_BOOTSTRAP_ADMIN_EMAIL
+exit
+```
+
+This is an explicit database write requiring operator authorization. It does not create a default password or an unauthenticated bootstrap endpoint. Later role changes use the authenticated admin API.
+
+## Troubleshooting
+
+| Symptom | Check and correction |
+|---|---|
+| Targets unhealthy | SSM: `sudo tail -n 100 /var/log/docuprocess-bootstrap.log`, `sudo journalctl -u docuprocess-api -n 100 --no-pager`, `curl -i localhost:8000/api/v1/health`. Health requires RDS and DynamoDB. |
+| Artifact download denied or missing | Confirm the published version/key and bucket policy for the existing instance role. Publish the same version before booting instances. |
+| Package downloads stall | Check private route tables, NAT gateway and its public route/EIP. Do not assign public instance IPs to work around routing. |
+| Launch template authorization failure | Confirm the explicit gp2 root mapping and permitted instance type (ADR-034). |
+| RDS unreachable/TLS error | Check app-to-DB security groups, private subnet group and the RDS CA download. Preserve certificate and hostname verification. |
+| Migration fails | Inspect the bootstrap log and MySQL advisory lock owner. Both instances must use the same lock and packaged migrations. Do not edit migration history manually. |
+| OCR fails | Check `tesseract --version` and `tesseract --list-langs` on the instance. Confirm the AL2023 language package names; those installs need live verification. |
+| Job stuck or retried | Inspect its status/available_at/attempts in the jobs table and `sudo journalctl -u docuprocess-worker -n 100 --no-pager`. Expired owners cannot commit results. |
+| SNS email absent | Check subscription confirmation and notification_status. After three failed publication attempts the job remains terminal; it is not processed again. Publication and database commit are not one transaction (ADR-036). |
+| Stale frontend | Re-run the approved frontend deployment/invalidation. Confirm the distribution has finished deploying. |
+| AWS AccessDenied | Record the action, service and caller context. Lab-role success does not prove instance-role access. Do not create IAM policies to bypass sandbox restrictions. |
+| CloudTrail denied | Record the exact failure and accepted exception before changing enable_cloudtrail. Refer to previous evidence in specs/answered-questions.md. |
+| UI cannot retain sessionStorage | The page uses per-tab memory navigation. Reloading requires sign-in again. Tokens never use localStorage. |
+
+## Teardown
+
+Only after approval for destroying the complete stack:
 
 ```sh
 make destroy
 ```
 
-**(after implementation)** Empties the S3 buckets (`scripts/empty_buckets.sh`), then prints the destroy plan and asks for approval. The buckets live in a CloudFormation stack, which cannot delete non-empty buckets (`ADR-035`).
+The target displays the destroy plan, empties the output-named buckets including versions/delete markers, then runs Terraform destroy with its interactive approval. CloudFormation cannot delete nonempty buckets. Stop application writes before teardown and verify RDS, EC2, NAT, buckets and CloudFront are removed. No final RDS snapshot is kept.
 
-**Expected:** `Destroy complete!`. Check the RDS console afterwards: the instance should be gone, and no snapshot is kept (`skip_final_snapshot = true`).
-
-## Troubleshooting
-
-### T1. ALB targets are unhealthy
-
-- **Symptom:** the target group shows `unhealthy` or `draining`.
-- **Likely cause:** the API failed to start or cannot reach RDS or DynamoDB.
-- **Check:** connect with SSM and run:
-  ```sh
-  sudo tail -n 100 /var/log/docuprocess-bootstrap.log
-  sudo journalctl -u docuprocess-api -n 100 --no-pager
-  curl -s localhost:8000/api/v1/health
-  ```
-- **Fix:** if the bootstrap log shows a download error, see **T2**. If the health endpoint returns `503`, check **T4** and **T5**.
-
-### T2. userData cannot download the release
-
-- **Symptom:** bootstrap log shows `AccessDenied` or `NoSuchKey` for the artifacts bucket.
-- **Cause:** the release version in `terraform.tfvars` was not published, or the artifacts bucket policy does not name the instance role (`ADR-033`).
-- **Fix:** run `make publish` with the same version, or verify the instance profile permissions. If `s3:GetObject` is denied, check the bucket policy (`ADR-033`).
-
-### T11. Launch fails with "not authorized to use launch template"
-
-- **Symptom:** the Auto Scaling Group cannot be created, or instances never launch.
-- **Cause:** the launch template uses the `gp3` root volume, which the lab denies (`ADR-034`).
-- **Fix:** map the root volume explicitly as `gp2` in the launch template.
-
-### T3. Instances cannot install or reach the internet
-
-- **Symptom:** bootstrap log stops at `uv python install` or a package download.
-- **Cause:** NAT gateway or private route table is missing.
-- **Check:** VPC console → route table for the app subnets must have `0.0.0.0/0` → NAT gateway. The NAT gateway must be in a public subnet and have an Elastic IP.
-- **Fix:** re-apply Terraform. NAT creation is verified as allowed (`specs/answered-questions.md`, Q-004).
-
-### T4. API cannot reach RDS
-
-- **Symptom:** logs show `Can't connect to MySQL server`.
-- **Check:** `db-sg` must allow TCP 3306 from `app-sg`. The DB instance must be in the `docuprocess-sandbox-db` subnet group.
-- **Fix:** re-apply Terraform. Do not open the database to `0.0.0.0/0`.
-
-### T5. Migration fails at boot
-
-- **Symptom:** `journalctl` shows a migration error.
-- **Cause:** another instance holds the migration lock, or a migration file is broken.
-- **Fix:** migrations take a MySQL lock, so the second instance waits. If the lock is stuck, check `SHOW PROCESSLIST` through a session on an instance. Do not edit `schema_migrations` by hand.
-
-### T6. OCR fails on a missing system package
-
-- **Symptom:** jobs fail with `OCR_FAILED` and reason `PROVIDER_PERMANENT`, and the bootstrap log shows `tesseract: command not found`.
-- **Cause:** the package install step did not run or used a wrong package name (`ADR-012`).
-- **Fix:** run `tesseract --version` on the instance, fix the package name in userData, and redeploy.
-
-### T7. SNS email does not arrive
-
-- **Cause:** the subscription was never confirmed (see step 9).
-- **Fix:** confirm the subscription from the email. Confirmation links expire, so request a new one by deleting and recreating the subscription in Terraform, or re-run `make deploy`.
-
-### T8. CloudFront serves old files
-
-- **Fix:** run `make deploy-frontend` again, or create an invalidation for `/*` manually:
-  ```sh
-  aws cloudfront create-invalidation --distribution-id <id> --paths "/*"
-  ```
-
-### T9. Terraform fails with AccessDenied on a service
-
-- **Check:** the service must appear in the sandbox service list (`specs/02-aws-sandbox-constraints.md` section 0). If it does, the sandbox may have blocked a specific action. Note the exact action from the error message.
-- **Fix:** do not add IAM permissions. Record the blocker in `specs/open-questions.md`, and use the documented fallback if one exists.
-
-### T10. CloudTrail cannot be created
-
-- **Cause:** `cloudtrail:CreateTrail` is denied for the lab role (`specs/answered-questions.md`, Q-003).
-- **Fix:** set `enable_cloudtrail = false` and record the blocker in `risks-and-exceptions.md`.
-
-## Known limitations
-
-These are accepted for the sandbox and listed in `risks-and-exceptions.md` (once written):
-- Single NAT gateway and Single-AZ RDS.
-- HTTP between CloudFront and the ALB.
-- RDS not encrypted at rest.
-- Terraform state is local. Keep `infra/terraform/terraform.tfstate` safe; losing it means Terraform no longer knows the resources it created.
+Accepted limitations and verification boundaries are in [risks-and-exceptions.md](risks-and-exceptions.md).

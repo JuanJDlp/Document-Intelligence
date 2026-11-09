@@ -54,7 +54,7 @@ Implementation: `app/frontend/`. Static files only: HTML, CSS, and vanilla JavaS
 ## 5. Security
 
 - **FE-SEC-01** (active) All dynamic text is inserted with `textContent`, never `innerHTML`, to prevent XSS from filenames or extracted values.
-- **FE-SEC-02** (active) A Content Security Policy meta tag is set on every page: `default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'`.
+- **FE-SEC-02** (active) A Content Security Policy meta tag is set on every page: `default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'`.
 
 ## 6. Module layout
 
@@ -76,3 +76,5 @@ app/frontend/
 
 - **FE-ACC-01** (active) Manual checklist in `docs/` covers: register, login, upload each supported type, reject unsupported type, reject oversize file, history refresh, detail polling, logout, expired token redirect.
 - **FE-ACC-02** (active) A static check (`scripts/check_frontend.sh`) fails if `innerHTML` appears in `app/frontend/assets/`, or if a `<script src>` points to an external host (`TST-LINT-02`).
+
+CloudFront also sends frame-ancestors 'none' in the CSP response header (ADR-037). Browsers ignore that directive in meta tags.

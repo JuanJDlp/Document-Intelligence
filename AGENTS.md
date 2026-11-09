@@ -118,7 +118,7 @@ The `Makefile` at the repository root exposes these targets. Create them if miss
 
 | Target | Purpose |
 |---|---|
-| `make setup` | Create virtualenvs and install dev dependencies for all Python packages |
+| `make setup` | Create a uv workspace environment and install locked dependencies |
 | `make lint` | `ruff check` + `ruff format --check` on Python; `terraform fmt -check -recursive` on Terraform |
 | `make typecheck` | `mypy` on `app/receipt_engine`, `app/worker`, `app/api` |
 | `make test` | All unit and contract tests (no AWS calls, no network) |

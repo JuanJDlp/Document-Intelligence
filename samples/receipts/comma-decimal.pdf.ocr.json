@@ -1,0 +1,22 @@
+{
+  "provider": "synthetic-fixture",
+  "lines": [
+    {
+      "text": "SYNTHETIC MARKET",
+      "confidence": 0.9
+    },
+    {
+      "text": "RECIBO",
+      "confidence": 0.9
+    },
+    {
+      "text": "FECHA: 15/01/2026",
+      "confidence": 0.9
+    },
+    {
+      "text": "TOTAL: COP 119,50",
+      "confidence": 0.9
+    }
+  ],
+  "structured_line_items": []
+}

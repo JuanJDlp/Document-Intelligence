@@ -15,7 +15,7 @@
 
 ### 1.3 Data protection
 - **SEC-DATA-01** (active) Data at rest: S3 with SSE-S3, DynamoDB with the default AWS-owned encryption, RDS storage encryption is NOT enabled, because the default RDS encryption key is a KMS key and the sandbox has KMS list access only (`CON-KMS-01`). Decision `ADR-032` records this. EBS root volumes are encrypted (`INF-EC2-02`).
-- **SEC-DATA-02** (active) Data in transit: browser to CloudFront is HTTPS (`INF-CDN-02`). CloudFront to ALB is HTTP inside AWS (`SEC-NET-03`). Application to RDS, DynamoDB, S3, and SNS uses TLS through the AWS SDK and MySQL driver defaults.
+- **SEC-DATA-02** (active) Data in transit: browser to CloudFront is HTTPS (`INF-CDN-02`). CloudFront to ALB is HTTP inside AWS (`SEC-NET-03`). Application to RDS, DynamoDB, S3, and SNS uses TLS through the AWS SDK and explicit MySQL TLS verification against the AWS RDS CA bundle (ADR-037).
 - **SEC-DATA-03** (active) Uploaded files are not public. Downloads are not offered in v1; the API never exposes S3 URLs.
 
 ### 1.4 Passwords and sessions

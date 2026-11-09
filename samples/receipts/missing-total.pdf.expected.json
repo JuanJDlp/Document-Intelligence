@@ -1,0 +1,9 @@
+{
+  "status": "partial",
+  "fields": {
+    "total": null
+  },
+  "warnings": [
+    "FIELD_MISSING"
+  ]
+}

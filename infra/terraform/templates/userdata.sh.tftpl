@@ -14,10 +14,12 @@ uv python install 3.12
 
 # INF-UD-05: non-secret configuration. The DB password is read from SSM at boot and never rendered here.
 install -d -m 0755 /etc/docuprocess
+curl --fail --silent --show-error https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o /etc/docuprocess/rds-ca.pem
 DB_PASSWORD="$(aws ssm get-parameter --region "${region}" --name "${db_password_parameter}" --with-decryption --query Parameter.Value --output text)"
 umask 077
 cat > /etc/docuprocess/app.env <<ENV
 DOCUPROCESS_AWS_REGION=${region}
+DOCUPROCESS_DB_SSL_CA=/etc/docuprocess/rds-ca.pem
 DOCUPROCESS_DB_HOST=${db_host}
 DOCUPROCESS_DB_NAME=${db_name}
 DOCUPROCESS_DB_USER=${db_user}
@@ -40,8 +42,9 @@ tar -xzf /tmp/release.tar.gz -C /opt/docuprocess/releases/${release_version}
 ln -sfn /opt/docuprocess/releases/${release_version} /opt/docuprocess/current
 
 # INF-UD-04: virtualenv with the release packages.
-uv venv --python 3.12 /opt/docuprocess/current/.venv
-uv pip install --python /opt/docuprocess/current/.venv/bin/python \
+uv venv --allow-existing --python 3.12 /opt/docuprocess/current/.venv
+uv pip install --python /opt/docuprocess/current/.venv/bin/python -r /opt/docuprocess/current/requirements.lock
+uv pip install --no-deps --python /opt/docuprocess/current/.venv/bin/python \
   /opt/docuprocess/current/packages/receipt_engine \
   /opt/docuprocess/current/packages/worker \
   /opt/docuprocess/current/packages/api

@@ -1,0 +1,15 @@
+{
+  "status": "completed",
+  "fields": {
+    "subtotal": "100000.00",
+    "total": "119000.00"
+  },
+  "line_items": [
+    {
+      "description": "Synthetic notebooks",
+      "quantity": "2.00",
+      "unit_price": "50000.00",
+      "line_total": "100000.00"
+    }
+  ]
+}

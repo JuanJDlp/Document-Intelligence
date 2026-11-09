@@ -15,9 +15,9 @@
 | Engine golden | `app/receipt_engine/tests/golden/` | pytest, `samples/receipts/` | `ENG-TST-03` |
 | API contract | `app/api/tests/` | pytest, FastAPI `TestClient`, SQLite | `API-*` |
 | Worker unit | `app/worker/tests/` | pytest, `moto` | `WRK-*`, `DAT-ACC-07` |
-| Cross-component | `tests/integration/` | pytest, `moto`, fake OCR | upload → worker → result, without real AWS |
+| Cross-component | `tests/` | pytest, `moto`, fake OCR | upload → worker → result, without real AWS |
 | Infrastructure static | `scripts/check_constraints.sh`, `terraform validate` | bash, terraform | `CON-*`, `INF-*` |
-| Security | `tests/security/` | pytest | `SEC-LOG-03`, `TST-SEC-01` |
+| Security | `tests/ and component tests` | pytest | `SEC-LOG-03`, `TST-SEC-01` |
 | Live sandbox | `scripts/smoke_test.py`, manual checklist | Python `httpx` | `TST-E2E-*` |
 
 ## 3. Makefile targets (normative)
@@ -26,13 +26,13 @@ The `Makefile` at the root is the only entry point for humans and agents. Each t
 
 | Target | Command semantics | Requirement |
 |---|---|---|
-| `setup` | Creates `.venv` per Python package with `uv` and installs dev extras | `TST-MK-01` |
+| `setup` | Creates a shared workspace .venv with uv and installs locked dev dependencies | `TST-MK-01` |
 | `lint` | `ruff check` and `ruff format --check` on `app/ tests/ scripts/`; `terraform fmt -check -recursive infra/terraform`; `scripts/check_constraints.sh`; `scripts/check_frontend.sh` | `TST-MK-02` |
 | `typecheck` | `mypy --strict app/receipt_engine/src`; `mypy app/worker/src app/api/src` | `TST-MK-03` |
 | `test` | `pytest app/receipt_engine app/api app/worker tests` | `TST-MK-04` |
 | `tf-validate` | `terraform -chdir=infra/terraform init -backend=false && terraform -chdir=infra/terraform validate` | `TST-MK-05` |
 | `tf-plan` | `terraform -chdir=infra/terraform plan -var-file=terraform.tfvars` (read-only) | `TST-MK-06` |
-| `bootstrap-artifacts` | `terraform apply -target=module.storage` (requires explicit user approval) | `TST-MK-07` |
+| `bootstrap-artifacts` | `terraform apply -target=module.buckets` (requires explicit user approval) | `TST-MK-07` |
 | `package` | Builds `dist/docuprocess-<version>.tar.gz` and `docs/openapi.json` | `TST-MK-08` |
 | `publish` | Runs `scripts/publish_release.sh` to upload the tarball to the artifacts bucket (requires approval) | `TST-MK-09` |
 | `deploy` | `terraform apply` with `release_version` (requires explicit approval) | `TST-MK-10` |
@@ -51,14 +51,14 @@ The `Makefile` at the root is the only entry point for humans and agents. Each t
   - `multi_az\s*=\s*true`, `publicly_accessible\s*=\s*true`, `key_name`;
   - `instance_type` values outside `t2.*`/`t3.*` from `nano` to `medium`;
   - `aws_ebs_volume` or `volume_size` above 35 GB for EC2 and `allocated_storage` above 100 GB for RDS.
-- **TST-CON-02** (active) `scripts/check_constraints.sh` also fails when `app/receipt_engine/src` imports `boto3`, `botocore`, `fastapi`, `sqlalchemy`, `pymysql`, or `worker`/`api` packages (`ENG-SCOPE-02`). Implemented as a test in `app/receipt_engine/tests/test_boundaries.py` so it also runs under `make test`.
+- **TST-CON-02** (active) `scripts/check_constraints.sh` also fails when `app/receipt_engine/src` imports `boto3`, `botocore`, `fastapi`, `sqlalchemy`, `pymysql`, or `worker`/`api` packages (`ENG-SCOPE-02`). Implemented as a test in `app/receipt_engine/tests/test_engine.py` so it also runs under `make test`.
 - **TST-CON-03** (active) `terraform plan` output is reviewed by the operator for the forbidden types listed in `02` section 3 before any apply (`CON-*`).
 - **TST-LINT-02** (active) `scripts/check_frontend.sh` fails on `innerHTML` in `app/frontend/assets/` and on external `<script src>` or `<link href>` hosts (`FE-ACC-02`).
 
 ## 5. Test data
 
 - **TST-DATA-01** (active) `samples/receipts/` holds synthetic documents: at least one PDF receipt, one PNG receipt, one JPEG receipt, one invoice with line items, one receipt with a comma-decimal amount, one receipt with a missing total, one receipt with a negative total (validation failure), one blank image (no text), one multi-page PDF, one encrypted PDF, one text file renamed `.pdf`.
-- **TST-DATA-02** (active) Each sample has `<name>.ocr.json` (recorded provider output) and `<name>.expected.json` (hand-written expected engine output). `scripts/make_samples.py` MAY generate the PDF/PNG files but MUST NOT generate expected outputs.
+- **TST-DATA-02** (active) Each sample has `<name>.ocr.json` (recorded provider output) and `<name>.expected.json` (hand-written expected engine output). `scripts/make_samples.py` MAY generate the PDF/PNG files but MUST NOT generate expected outputs. Golden JSON expectations assert stable contract projections (status, selected fields, warning codes and error reasons), excluding elapsed time and real OCR variability. OCR recordings are deterministic synthetic provider fixtures; they do not claim live provider evidence.
 - **TST-DATA-03** (active) Synthetic merchants and NIT numbers only. NITs are generated with the DIAN check digit algorithm (`ENG-NRM-04`) and documented in `samples/README.md`.
 
 ## 6. Acceptance checklist (sandbox)
@@ -74,7 +74,7 @@ Run in order after `make deploy`. Each item is verified and recorded with date a
 | TST-E2E-05 | CloudFront serves `/` and `/api/v1/health` over HTTPS | `INF-CDN-05`, `ADR-030` |
 | TST-E2E-06 | Register, login, upload a sample PDF receipt via the browser | `PRD-F-01..03` |
 | TST-E2E-07 | Job reaches a terminal state within 2 minutes; the `documents` item contains `result` | `WRK-ACC-02` |
-| TST-E2E-08 | Exactly one SNS message for that job; the message contains no extracted data | `WRK-NOT-02` |
+| TST-E2E-08 | A notification is received for that job (SNS duplicate delivery is possible; ADR-036); the message contains no extracted data | `WRK-NOT-02` |
 | TST-E2E-09 | Upload of a 6 MB file is rejected with `413`; upload of a text file renamed `.pdf` is rejected with `415` | `API-DOC-02/03` |
 | TST-E2E-10 | `terraform apply` immediately again shows no changes | `INF-ACC-04` |
 | TST-E2E-11 | Scale-out: generate CPU load on one instance; ASG desired capacity increases; never above 4 | `INF-ASG-04`, `INF-ASG-01` |

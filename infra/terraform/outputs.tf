@@ -62,3 +62,13 @@ output "instance_role_arn" {
   description = "Instance role ARN used by resource policies (ADR-033)."
   value       = local.instance_role_arn
 }
+
+output "cloudfront_distribution_id" {
+  description = "Distribution ID for frontend invalidations."
+  value       = module.frontend.distribution_id
+}
+
+output "audit_logs_bucket_name" {
+  description = "Audit bucket for approved teardown."
+  value       = module.buckets.audit_logs_bucket_name
+}

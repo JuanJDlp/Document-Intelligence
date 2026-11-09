@@ -180,7 +180,7 @@ Outputs MUST NOT include the DB password.
 ## 15. Deployment order (required, enforced by Makefile)
 
 1. `make tf-validate`, then `make tf-plan` (operator reviews).
-2. Bootstrap the artifacts bucket: `terraform apply -target=module.storage` (creates the bucket that the release is uploaded to).
+2. Bootstrap the artifacts bucket: `terraform apply -target=module.buckets` (creates the bucket that the release is uploaded to).
 3. `make package` and `scripts/publish_release.sh <version>` (uploads to `artifacts` bucket).
 4. Full `terraform apply -var release_version=<version>`.
 5. Wait for ALB health check `200` on `/api/v1/health`.
