@@ -17,8 +17,8 @@ The system runs in the AWS Academy Sandbox, region `us-east-1`. Constraints are 
 | ARC-C-07 | Relational database | RDS MySQL 8.0, Single-AZ | Private DB subnets | Users, sessions, roles |
 | ARC-C-08 | Document store | S3 bucket `uploads` | S3 | Original uploaded files |
 | ARC-C-09 | NoSQL store | DynamoDB tables `documents`, `jobs` | DynamoDB | Document metadata, job state, results |
-| ARC-C-10 | Notifications | SNS topic `processing-events` | SNS | Email to subscribers on terminal job states |
-| ARC-C-11 | Monitoring | CloudWatch alarms and dashboard | CloudWatch | EC2, ASG, ALB, RDS metrics; alarm actions to SNS |
+| ARC-C-10 | Notifications | SNS topics `processing-events` and `ops-alarms` | SNS | Two topics, each with an email subscription to `alert_email`: `processing-events` carries terminal job states (processing email); `ops-alarms` carries CloudWatch alarm notifications (ops email) |
+| ARC-C-11 | Monitoring | CloudWatch alarms and dashboard | CloudWatch | EC2, ASG, ALB, RDS metrics; alarm actions to SNS `ops-alarms` |
 | ARC-C-12 | Audit | CloudTrail trail + S3 log bucket | CloudTrail | Records API activity in the account |
 | ARC-C-13 | Release artifacts | S3 bucket `artifacts` | S3 | Versioned application tarballs consumed by EC2 userData |
 
@@ -34,8 +34,9 @@ flowchart LR
     ASG -->|S3 gateway endpoint| S3U[(S3 uploads)]
     ASG -->|DynamoDB gateway endpoint| DDB[(DynamoDB documents, jobs)]
     ASG -->|NAT| SNS[SNS processing-events]
-    SNS -->|email| OPS[Subscribers]
-    CW[CloudWatch alarms] -->|alarm action| SNS
+    SNS -->|processing email| OPS[Subscribers]
+    CW[CloudWatch alarms] -->|alarm action| ALARMS[SNS ops-alarms]
+    ALARMS -->|ops email| OPS
     CT[CloudTrail] --> S3L[(S3 audit logs)]
 ```
 
