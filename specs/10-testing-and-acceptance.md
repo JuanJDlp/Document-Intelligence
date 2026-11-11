@@ -39,8 +39,10 @@ The `Makefile` at the root is the only entry point for humans and agents. Each t
 | `deploy-frontend` | Runs `scripts/deploy_frontend.sh` (requires approval) | `TST-MK-11` |
 | `smoke` | Runs `scripts/smoke_test.py` against `SMOKE_BASE_URL` | `TST-MK-12` |
 | `destroy` | `terraform destroy` (requires explicit approval, prints the plan first) | `TST-MK-13` |
+| `up` | One-command deployment from a clean sandbox: `package`, `bootstrap-artifacts`, `publish`, `deploy`, `deploy-frontend` for `VERSION`, then `scripts/wait_healthy.sh` waits until the target group has `min_size` healthy targets and prints the CloudFront URL (requires explicit approval) | `TST-MK-15` |
+| `load` | Runs `scripts/load_test.py`: synthetic HTTPS traffic against the CloudFront URL (register one synthetic user, then concurrent login/logout pairs; each login runs an Argon2id verification, which is CPU-bound) for `LOAD_MINUTES` with `LOAD_WORKERS` threads, printing request counts, ASG desired/in-service capacity and ASG average CPU every 30 s. Prints no tokens or bodies (requires explicit approval: it can make the ASG launch instances) | `TST-MK-16` |
 
-- **TST-MK-14** (active) Targets that create or delete billable AWS resources (`bootstrap-artifacts`, `publish`, `deploy`, `deploy-frontend`, `destroy`) MUST NOT run without explicit approval from the user in the current conversation (`AGENTS.md` section 8).
+- **TST-MK-14** (active) Targets that create or delete billable AWS resources (`bootstrap-artifacts`, `publish`, `deploy`, `deploy-frontend`, `up`, `load`, `destroy`) MUST NOT run without explicit approval from the user in the current conversation (`AGENTS.md` section 8).
 
 ## 4. Static guards
 
@@ -77,7 +79,7 @@ Run in order after `make deploy`. Each item is verified and recorded with date a
 | TST-E2E-08 | A notification is received for that job (SNS duplicate delivery is possible; ADR-036); the message contains no extracted data | `WRK-NOT-02` |
 | TST-E2E-09 | Upload of a 6 MB file is rejected with `413`; upload of a text file renamed `.pdf` is rejected with `415` | `API-DOC-02/03` |
 | TST-E2E-10 | `terraform apply` immediately again shows no changes | `INF-ACC-04` |
-| TST-E2E-11 | Scale-out: generate CPU load on one instance; ASG desired capacity increases; never above 4 | `INF-ASG-04`, `INF-ASG-01` |
+| TST-E2E-11 | Scale-out: `make load` generates traffic; ASG desired capacity increases; never above 4 | `INF-ASG-04`, `INF-ASG-01` |
 | TST-E2E-12 | Alarm `asg-cpu-high` triggers and notifies `ops-alarms` in test mode (set threshold low via variable for the test only) | `INF-MON-01`, `OBS-ALM-01` |
 | TST-E2E-13 | CloudTrail trail is logging, or the blocker is documented (`answered-questions.md`, Q-003) | `INF-AUD-02/03` |
 | TST-E2E-14 | Operator reaches an instance with SSM Session Manager and no port 22 is open | `CON-EC2-05`, `SEC-IAM-03` |

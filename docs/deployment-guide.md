@@ -50,6 +50,16 @@ make tf-plan
 
 Review the plan before approval: no IAM creation, Lambda, custom DNS/certificates, public RDS or SSH; two private application instances, Single-AZ RDS, and the documented sandbox instance/storage limits. A saved plan is sensitive because it may contain state values.
 
+## One-command deployment
+
+After sections 1–3 and explicit approval, one command runs sections 4–6 in order and waits for the application:
+
+```sh
+make up VERSION=1.0.0
+```
+
+It packages the release, creates the buckets (CloudFormation), uploads the release, applies the full stack with ELB health checks, uploads the frontend, and waits until the target group has the ASG minimum of healthy targets (`scripts/wait_healthy.sh`, 20-minute timeout). It ends by printing the CloudFront URL. Then confirm the SNS emails (section 6) and run the smoke test (section 7). The sections below describe the same steps one by one, for troubleshooting.
+
 ## 4. Bootstrap buckets and publish the release
 
 The buckets are owned by the `buckets` module through CloudFormation (ADR-035). The artifact must exist before application instances start.

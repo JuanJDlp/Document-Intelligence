@@ -28,6 +28,14 @@ make tf-validate
 make package VERSION=1.0.0
 ```
 
+Deploy and demonstrate (AWS writes, each needs approval; see the deployment guide):
+
+```sh
+make up VERSION=1.0.0                                 # full deployment from a clean sandbox
+SMOKE_BASE_URL=https://<cloudfront-domain> make smoke # end-to-end check
+make load                                             # traffic simulation for the Auto Scaling demo
+```
+
 `uv.lock` fixes dependencies. `make samples` regenerates document inputs only; golden expectations are independently authored. Packaging writes `dist/docuprocess-1.0.0.tar.gz` and `docs/openapi.json`.
 
 ## Deploy to AWS

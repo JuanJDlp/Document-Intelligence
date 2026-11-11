@@ -13,7 +13,11 @@
 
 After an approved deployment, run make smoke with SMOKE_BASE_URL set to the CloudFront HTTPS URL. Repeat the browser flow and confirm the SNS email subscription before testing notifications. Verify the document and job in DynamoDB and the uploaded object in the private S3 bucket. Do not display credentials, session tokens or document contents in logs.
 
-Show two healthy ALB targets and SSM access without SSH. Generate controlled CPU load only after explicit approval, observe ASG scale-out within the configured maximum, then stop the load. Observe the CloudWatch alarm, SNS operational notification and CloudTrail logging.
+Deploy from a clean sandbox with `make up VERSION=1.0.0` (after approval). Show two healthy ALB targets and SSM access without SSH.
+
+Auto Scaling: after approval, run `make load` (defaults: 24 workers for 10 minutes; override with `LOAD_WORKERS` and `LOAD_MINUTES`). It sends login/logout traffic through CloudFront; each login verifies an Argon2id hash, so instance CPU rises. Every 30 s it prints the request rate, the ASG desired and in-service capacity, and the ASG average CPU. Expect the target-tracking policy (60 % CPU) to raise the desired capacity within the maximum of 4 after a few minutes, and the `asg-cpu-high` alarm to notify `ops-alarms`. Stop with Ctrl+C or let it finish; scale-in follows after the cooldown.
+
+Audit: the lab denies `cloudtrail:CreateTrail` (`INF-AUD-03`), so the project trail is disabled. Show CloudTrail **Event history** in the console instead: it is always on, keeps 90 days of management events, and lists the calls made by Terraform during the deployment (for example `CreateAutoScalingGroup`, `CreateDBInstance`).
 
 Repeat the approved Terraform plan after deployment: expect no infrastructure differences except intentionally managed scaling capacity. A new release is rolled out by replacing instances one at a time (ADR-039) and must preserve RDS/DynamoDB/S3 data. Mark these checks unverified until actually executed.
 

@@ -72,3 +72,8 @@ output "audit_logs_bucket_name" {
   description = "Audit bucket for approved teardown."
   value       = module.buckets.audit_logs_bucket_name
 }
+
+output "target_group_arn" {
+  description = "API target group. Used by scripts/wait_healthy.sh."
+  value       = module.alb.target_group_arn
+}

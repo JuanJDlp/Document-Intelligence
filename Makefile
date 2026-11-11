@@ -3,7 +3,7 @@ UV ?= uv
 TF ?= terraform
 VERSION ?= 1.0.0
 TF_DIR := infra/terraform
-.PHONY: setup lint format typecheck test test-ocr samples demo tf-validate tf-plan package package-check smoke bootstrap-artifacts publish deploy deploy-frontend destroy check-constraints
+.PHONY: setup lint format typecheck test test-ocr samples demo tf-validate tf-plan package package-check smoke bootstrap-artifacts publish deploy deploy-frontend up load destroy check-constraints
 setup:
 	$(UV) sync --locked
 format:
@@ -49,6 +49,14 @@ deploy:
 	$(TF) -chdir=$(TF_DIR) apply .release.tfplan
 deploy-frontend:
 	bash scripts/deploy_frontend.sh
+# One-command deployment from a clean sandbox (TST-MK-15). Requires approval: creates billable resources.
+up: package bootstrap-artifacts publish deploy deploy-frontend
+	bash scripts/wait_healthy.sh
+# Traffic simulation for the Auto Scaling demo (TST-MK-16). Requires approval: the ASG may launch instances.
+load:
+	LOAD_BASE_URL=https://$$($(TF) -chdir=$(TF_DIR) output -raw cloudfront_domain_name) \
+	LOAD_ASG_NAME=$$($(TF) -chdir=$(TF_DIR) output -raw asg_name) \
+	$(UV) run --no-sync python scripts/load_test.py
 destroy:
 	$(TF) -chdir=$(TF_DIR) plan -destroy
 	bash scripts/empty_buckets.sh
