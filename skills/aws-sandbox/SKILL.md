@@ -78,3 +78,5 @@ The sandbox is torn down and recreated often. Each new lab session brings new cr
 - `ec2:MonitorInstances` (detailed monitoring) is explicitly denied (2026-11-10). EC2 and ASG CPU metrics arrive every 5 minutes, so target-tracking scale-out takes about 8–12 minutes of sustained load.
 - `autoscaling:StartInstanceRefresh` is denied by a service control policy (2026-11-10, `ADR-039`).
 - Dry-run probes (`--dry-run`) validate permissions without creating anything. Use them before any real call. Real tests that create resources need the user's approval.
+- A lab reset does not delete everything (2026-11-11): the DB password SSM parameter and two CloudFront policies survive, and the local state still lists resources that are gone. `make up` handles both through `make prepare-state` (`ADR-040`).
+- Scale-out verified (2026-11-11, `make load`, 4 workers): ASG average CPU reached 65 % about 5 min into the load, the target-tracking alarm triggered at about 7.5 min, desired went 2 → 3, and the new instance was InService at about 8 min.
