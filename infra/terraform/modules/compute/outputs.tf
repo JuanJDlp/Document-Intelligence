@@ -5,5 +5,5 @@ output "asg_name" {
 
 output "ami_id" {
   description = "AMI used by the launch template."
-  value       = data.aws_ami.al2023.id
+  value       = data.aws_ami.ubuntu.id
 }

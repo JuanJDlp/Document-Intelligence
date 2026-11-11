@@ -87,7 +87,7 @@ Constraints in `02-aws-sandbox-constraints.md` apply to every resource here. If 
 
 ## 8. Compute (`modules/compute`)
 
-- **INF-EC2-01** (active) AMI: `data "aws_ami"` owner `amazon`, name `al2023-ami-*-x86_64`, most recent. (`CON-EC2-04`)
+- **INF-EC2-01** (active) AMI: `data "aws_ami"` owner `amazon`, name `ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*`, most recent. The launch template takes the root device name from the AMI. (`CON-EC2-04`, `ADR-038`)
 - **INF-EC2-02** (active) Launch template:
   - instance type variable, default `t3.micro`;
   - `iam_instance_profile { name = var.instance_profile_name }` with no default; its value is discovered per session (`CON-IAM-03`);
@@ -98,7 +98,7 @@ Constraints in `02-aws-sandbox-constraints.md` apply to every resource here. If 
   - no public IP;
   - `user_data` base64-encoded from `templates/userdata.sh.tftpl`.
 - **INF-EC2-03** (active) The userData template is described in section 12.
-- **INF-EC2-04** (active) `instance_refresh` enabled on template change with `min_healthy_percentage = 50`.
+- **INF-EC2-04** (active) The Auto Scaling group always uses the latest launch template version and has no `instance_refresh` block (the lab denies `autoscaling:StartInstanceRefresh`). A new release or AMI is rolled out by replacing instances one at a time (`ADR-039`).
 
 ### 8.1 Auto Scaling Group
 - **INF-ASG-01** (active) `min_size = 2`, `desired_capacity = 2`, `max_size = 4`. (`CON-EC2-02`)
@@ -142,7 +142,7 @@ Constraints in `02-aws-sandbox-constraints.md` apply to every resource here. If 
 
 userData runs once per instance at first boot. It MUST be idempotent (safe to re-run).
 
-- **INF-UD-01** (active) Install system packages needed for the runtime (`dnf` packages only: `tar`, `gzip`, `awscli` if not present, `tesseract` only when `ocr_provider = "tesseract"`, `poppler-utils` only in that case).
+- **INF-UD-01** (active) Install system packages needed for the runtime with `apt-get` (`curl`, `unzip`, `tar`, `gzip`, and `tesseract-ocr`, `tesseract-ocr-spa`, `tesseract-ocr-eng` when `ocr_provider = "tesseract"`), then AWS CLI v2 from the official AWS installer if `aws` is not present (`ADR-038`).
 - **INF-UD-02** (active) Install `uv` and provision Python 3.12 with `uv python install 3.12`. If the default image lacks network access, the instance fails loudly (exit code non-zero) and the ASG replaces it.
 - **INF-UD-03** (active) Download `s3://<artifacts>/releases/<release_version>/docuprocess-<release_version>.tar.gz` to `/opt/docuprocess/releases/<release_version>/` and link `/opt/docuprocess/current`.
 - **INF-UD-04** (active) Create a venv under `/opt/docuprocess/current/.venv` and install the packages `app/receipt_engine`, `app/worker`, `app/api` from the release (pinned wheels, no network index needed beyond the NAT).

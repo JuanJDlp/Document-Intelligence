@@ -12,6 +12,6 @@ The OCR provider in v1 is Tesseract, run on the instance with `pytesseract`. PDF
 ## Consequences
 - Tesseract output has no structured summary fields. Extraction relies on text heuristics (`ENG-EXT-*`), so quality is lower than Textract `AnalyzeExpense` would give.
 - Multi-page PDFs are still rejected (`ENG-VAL-04`).
-- The tesseract binary and language data (`spa`, `eng`) must be installed in userData. Verify that the dnf package names exist on Amazon Linux 2023 during the first deploy.
+- The tesseract binary and language data (`spa`, `eng`) must be installed in userData. Amazon Linux 2023 has no Tesseract package (verified 2026-11-10), so the instances run Ubuntu 24.04 and install it with apt (`ADR-038`).
 
 Specs: `06-receipt-extraction-engine.md`, `03-infrastructure.md` (`INF-UD-01`)

@@ -76,7 +76,11 @@ After reviewing and approving the full release plan:
 make deploy VERSION=1.0.0
 ```
 
-The target creates a saved plan with the published version and ELB health checks, then applies it. Set the same version in the private tfvars file afterwards so future plans do not revert to infrastructure-only startup. New releases must use new version identifiers; the launch-template change triggers a rolling instance refresh.
+The target creates a saved plan with the published version and ELB health checks, then applies it. Set the same version in the private tfvars file afterwards so future plans do not revert to infrastructure-only startup. New releases must use new version identifiers. The lab denies `autoscaling:StartInstanceRefresh`, so a launch-template change does not replace running instances. Replace them one at a time, waiting for each replacement to be healthy (ADR-039):
+
+```sh
+aws autoscaling terminate-instance-in-auto-scaling-group --instance-id <instance-id> --no-should-decrement-desired-capacity
+```
 
 At boot each instance downloads the release, installs locked runtime dependencies and the three application packages, verifies MySQL TLS against the RDS CA, and runs forward-only migrations. MySQL `GET_LOCK` serializes migration runners. Systemd then starts the API and worker. RDS remains private.
 
@@ -140,7 +144,7 @@ This is an explicit database write requiring operator authorization. It does not
 | Launch template authorization failure | Confirm the explicit gp2 root mapping and permitted instance type (ADR-034). |
 | RDS unreachable/TLS error | Check app-to-DB security groups, private subnet group and the RDS CA download. Preserve certificate and hostname verification. |
 | Migration fails | Inspect the bootstrap log and MySQL advisory lock owner. Both instances must use the same lock and packaged migrations. Do not edit migration history manually. |
-| OCR fails | Check `tesseract --version` and `tesseract --list-langs` on the instance. Confirm the AL2023 language package names; those installs need live verification. |
+| OCR fails | Check `tesseract --version` and `tesseract --list-langs` on the instance. The instances run Ubuntu 24.04 and install `tesseract-ocr`, `tesseract-ocr-spa` and `tesseract-ocr-eng` with apt (ADR-038). |
 | Job stuck or retried | Inspect its status/available_at/attempts in the jobs table and `sudo journalctl -u docuprocess-worker -n 100 --no-pager`. Expired owners cannot commit results. |
 | SNS email absent | Check subscription confirmation and notification_status. After three failed publication attempts the job remains terminal; it is not processed again. Publication and database commit are not one transaction (ADR-036). |
 | Stale frontend | Re-run the approved frontend deployment/invalidation. Confirm the distribution has finished deploying. |

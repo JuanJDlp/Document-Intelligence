@@ -7,7 +7,7 @@ Use Python 3.12 and a uv workspace with three independently installable packages
 
 The offline demo uses SQLite for identity, moto for S3/DynamoDB/SNS and a separate worker thread with real Tesseract. These are local adapters, not evidence of AWS deployment. Normal tests inject fake OCR; real OCR is a separate check.
 
-Bootstrap creates module.buckets (the CloudFormation stack containing all four buckets), publishes a release, and then performs the full apply with ELB health checks. Release updates trigger an ASG instance refresh. MySQL connections explicitly verify TLS with the AWS RDS CA bundle installed at boot.
+Bootstrap creates module.buckets (the CloudFormation stack containing all four buckets), publishes a release, and then performs the full apply with ELB health checks. Release updates are rolled out by replacing instances one at a time (`ADR-039`). MySQL connections explicitly verify TLS with the AWS RDS CA bundle installed at boot.
 
 Requirements: TST-MK-01..13, INF-UD-03..07, INF-ASG-03, SEC-DATA-02.
 

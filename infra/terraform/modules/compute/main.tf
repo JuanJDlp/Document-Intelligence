@@ -1,12 +1,14 @@
 # Launch template and Auto Scaling Group for API and worker instances (INF-EC2-*, INF-ASG-*).
 
-data "aws_ami" "al2023" {
+# Ubuntu 24.04: Amazon Linux 2023 has no Tesseract package (ADR-038).
+# Canonical images carry the "amazon" owner alias, so CON-EC2-04 still holds.
+data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["amazon"] # CON-EC2-04
 
   filter {
     name   = "name"
-    values = ["al2023-ami-2023*-x86_64"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
 
   filter {
@@ -18,12 +20,12 @@ data "aws_ami" "al2023" {
 resource "aws_launch_template" "app" {
   name_prefix   = "${var.name}-app-"
   description   = "API and worker instances"
-  image_id      = data.aws_ami.al2023.id
+  image_id      = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
 
   # Root volume is mapped explicitly as gp2: the lab denies gp3 volumes (ADR-034).
   block_device_mappings {
-    device_name = "/dev/xvda"
+    device_name = data.aws_ami.ubuntu.root_device_name
 
     ebs {
       volume_size           = var.root_volume_size_gb
@@ -85,13 +87,8 @@ resource "aws_autoscaling_group" "app" {
     propagate_at_launch = true
   }
 
-  instance_refresh {
-    strategy = "Rolling"
-    preferences {
-      min_healthy_percentage = 50
-      instance_warmup        = 300
-    }
-  }
+  # No instance_refresh: the lab SCP denies autoscaling:StartInstanceRefresh (ADR-039).
+  # The group always launches the latest template version; roll out by replacing instances.
 
   lifecycle {
     create_before_destroy = true

@@ -10,7 +10,7 @@ The lab overview is the authoritative list of what the sandbox tolerates. It is 
 
 | Service | Allowed scope (lab overview) | Our use |
 |---|---|---|
-| EC2 | `t2`/`t3` from `t.nano` to `t.medium`; EBS `gp2` up to 35 GB; On-Demand only; Amazon-provided AMIs (Linux and Windows) | `t3.micro`, 20 GB `gp2`, Amazon Linux 2023 (`CON-EC2-*`) |
+| EC2 | `t2`/`t3` from `t.nano` to `t.medium`; EBS `gp2` up to 35 GB; On-Demand only; Amazon-provided AMIs (Linux and Windows) | `t3.micro`, 20 GB `gp2`, Ubuntu 24.04 published under the `amazon` owner alias (`CON-EC2-*`, `ADR-038`) |
 | RDS | `db.t2`/`db.t3` from `db.t.micro` to `db.t.medium`; Single AZ only ("Do not create a standby instance"); storage `gp2` up to 100 GB; engines Aurora, MySQL, PostgreSQL, MariaDB; On-Demand | `db.t3.micro`, MySQL 8.0, Single-AZ, 20 GB (`CON-RDS-*`) |
 | IAM | **Read access** only; List access | No IAM writes (`CON-IAM-01`). Terraform makes no IAM calls (`CON-IAM-02`). |
 | EC2 Auto Scaling | Allowed | ASG with target tracking (`INF-ASG-*`) |
@@ -60,7 +60,7 @@ Where the two sources differ, the more restrictive rule applies until the differ
 - **CON-EC2-01** (active) Instance types MUST be `t2.*` or `t3.*` between `nano` and `medium`. The default is `t3.micro`.
 - **CON-EC2-02** (active) Maximum 9 concurrent EC2 instances in the account. The ASG `max_size` MUST be ≤ 4 (see `INF-ASG-*`).
 - **CON-EC2-03** (active) EBS volumes MUST be `gp2` and ≤ 35 GB.
-- **CON-EC2-04** (active) AMIs MUST be provided by Amazon. Terraform resolves the AMI through `data "aws_ami"` filtered by owner `amazon`.
+- **CON-EC2-04** (active) AMIs MUST be provided by Amazon. Terraform resolves the AMI through `data "aws_ami"` filtered by owner `amazon`. Canonical's Ubuntu images carry that owner alias (`ADR-038`).
 - **CON-EC2-05** (active) Port 22 (SSH) MUST NOT be open. Operator access is through AWS Systems Manager Session Manager. No bastion host.
 - **CON-EC2-06** (active) Instances use the sandbox SSM instance profile (`CON-IAM-03`) for Systems Manager. The userData MUST NOT rely on any other instance-level permission until it is verified (see `ADR-033`).
 

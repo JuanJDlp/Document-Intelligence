@@ -15,7 +15,7 @@ After an approved deployment, run make smoke with SMOKE_BASE_URL set to the Clou
 
 Show two healthy ALB targets and SSM access without SSH. Generate controlled CPU load only after explicit approval, observe ASG scale-out within the configured maximum, then stop the load. Observe the CloudWatch alarm, SNS operational notification and CloudTrail logging.
 
-Repeat the approved Terraform plan after deployment: expect no infrastructure differences except intentionally managed scaling capacity. A new release must trigger the ASG instance refresh and preserve RDS/DynamoDB/S3 data. Mark these checks unverified until actually executed.
+Repeat the approved Terraform plan after deployment: expect no infrastructure differences except intentionally managed scaling capacity. A new release is rolled out by replacing instances one at a time (ADR-039) and must preserve RDS/DynamoDB/S3 data. Mark these checks unverified until actually executed.
 
 ## Observed local verification
 
