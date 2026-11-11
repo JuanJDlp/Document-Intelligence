@@ -1,1 +1,51 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'"><link rel="stylesheet" href="assets/app.css"><title>Document result</title></head><body><main><header><a href="dashboard.html">Back to documents</a><button id="logout">Sign out</button></header><h1 id="filename">Document result</h1><p id="notice" role="status"></p><section><h2>Processing</h2><dl id="processing"></dl></section><section><h2>Extracted fields</h2><dl id="fields"></dl><h3>Confidence</h3><dl id="confidence"></dl><h3>Warnings</h3><ul id="warnings"></ul><h3>Line items</h3><div id="line-items"></div></section></main><script type="module" src="assets/document.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <link rel="stylesheet" href="assets/app.css">
+  <title>Document details | DocuProcess Cloud</title>
+</head>
+<body class="workspace-page">
+<a class="skip-link" href="#main-content">Skip to content</a>
+<aside class="sidebar">
+  <a class="brand" href="dashboard.html" aria-label="DocuProcess Cloud home"><span class="brand-mark"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#layers"></use></svg></span><span>DocuProcess<span class="brand-subtitle">CLOUD</span></span></a>
+  <p class="nav-label">WORKSPACE</p>
+  <nav class="workspace-nav" aria-label="Workspace">
+    <a aria-label="Documents" class="nav-link " href="dashboard.html" ><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#folder"></use></svg><span>Documents</span><svg class="icon nav-chevron" aria-hidden="true" focusable="false"><use href="assets/icons.svg#chevron-right"></use></svg></a>
+    <a class="nav-link" href="dashboard.html#upload-panel"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#upload"></use></svg><span>Upload document</span></a>
+  </nav>
+  <div class="sidebar-note"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#scan"></use></svg><p>A clearer view of<br>your paperwork.</p></div>
+  <div class="account">
+    <span class="avatar" id="account-avatar" aria-hidden="true">·</span>
+    <div class="account-copy"><span id="account-name">Your account</span><span id="account-role">Document workspace</span></div>
+    <button class="icon-button logout" id="logout" type="button" disabled aria-label="Sign out" title="Sign out"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#logout"></use></svg></button>
+  </div>
+</aside>
+<div class="workspace">
+  <div class="topbar"><nav class="breadcrumbs" aria-label="Breadcrumb"><span>Workspace</span><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#chevron-right"></use></svg><a href="dashboard.html">Documents</a><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#chevron-right"></use></svg><span aria-current="page">Details</span></nav></div>
+  <main id="main-content" class="main-content">
+    <header class="page-header detail-header"><div><a class="back-link" href="dashboard.html"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#arrow-left"></use></svg> Back to documents</a><h1 id="filename">Document details</h1><p class="muted" id="document-meta">Loading document information…</p></div><div class="detail-header-actions"><span id="document-status"></span><button class="button button--secondary button--small" id="refresh-document" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#refresh"></use></svg> Refresh</button></div></header>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section class="panel processing-panel" aria-labelledby="progress-heading"><h2 class="visually-hidden" id="progress-heading">Processing progress</h2><ol class="processing-steps"><li id="step-received"><span class="step-marker"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#check"></use></svg></span><span>Received<small>Document accepted</small></span></li><li id="step-processing"><span class="step-marker"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#scan"></use></svg></span><span>Processing<small>Reading the details</small></span></li><li id="step-result"><span class="step-marker"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#document"></use></svg></span><span>Result<small>Ready for review</small></span></li></ol><p id="processing-message" class="processing-message">Getting the latest processing status…</p></section>
+    <section class="result-summary" aria-label="Extraction summary">
+      <div class="summary-card summary-card--total"><span class="summary-label">Extracted total</span><strong id="summary-total">—</strong><span id="summary-total-note">Available after extraction</span></div>
+      <div class="summary-card"><span class="summary-label"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#store"></use></svg> Merchant</span><strong id="summary-merchant">—</strong><span>As shown on the document</span></div>
+      <div class="summary-card"><span class="summary-label"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#calendar"></use></svg> Issue date</span><strong id="summary-date">—</strong><span>Document date</span></div>
+      <div class="summary-card"><span class="summary-label"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#scan"></use></svg> OCR confidence</span><strong id="summary-confidence">—</strong><span>Review against the original</span></div>
+    </section>
+    <div class="detail-grid">
+      <section class="panel fields-panel" aria-labelledby="fields-heading"><div class="panel-heading"><div><span class="section-kicker">THE DETAILS THAT MATTER</span><h2 id="fields-heading">Extracted information</h2></div><svg class="icon panel-heading-icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#document"></use></svg></div><dl id="fields" class="field-grid"><div class="field-placeholder">The extracted details will appear here.</div></dl></section>
+      <div class="detail-aside">
+        <section class="panel validation-panel" aria-labelledby="warnings-heading"><div class="panel-heading"><h2 id="warnings-heading">Review notes</h2><span class="count-badge" id="warning-count">—</span></div><p class="muted" id="warnings-empty">Validation notes will appear after processing.</p><ul id="warnings" class="warnings-list"></ul></section>
+        <details class="panel confidence-panel"><summary>Field confidence <svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#chevron-down"></use></svg></summary><p class="field-help">OCR confidence describes recognition certainty. Check important details against your original document.</p><div id="confidence" class="confidence-list"></div></details>
+      </div>
+    </div>
+    <section class="panel line-items-panel" aria-labelledby="line-items-heading"><div class="panel-heading"><div><h2 id="line-items-heading">Line items</h2><p class="muted">Individual entries found in the document.</p></div></div><div id="line-items" class="line-items-empty">Line items will appear after extraction.</div></section>
+    <details class="panel processing-details"><summary>Processing details <svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#chevron-down"></use></svg></summary><dl id="processing" class="field-grid"></dl></details>
+    <footer class="workspace-footer"><span>DocuProcess Cloud</span><span>Review extracted details before using them.</span></footer>
+  </main>
+</div>
+<script type="module" src="assets/document.js"></script>
+</body></html>

@@ -1,1 +1,49 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'"><link rel="stylesheet" href="assets/app.css"><title>DocuProcess Cloud</title></head><body><main><p class="eyebrow">Document workspace</p><h1>DocuProcess Cloud</h1><p>Upload a receipt or invoice and follow its processing status.</p><p id="notice" role="status"></p><div class="columns"><section><h2>Sign in</h2><form method="post" id="login"><label for="email">Email</label><input id="email" name="email" type="email" required maxlength="254" autocomplete="username" aria-describedby="notice"><label for="password">Password</label><input id="password" name="password" type="password" required maxlength="128" autocomplete="current-password" aria-describedby="notice"><button disabled>Sign in</button></form></section><section><h2>Create an account</h2><form method="post" id="register"><label for="full-name">Full name</label><input id="full-name" name="full_name" required maxlength="200" autocomplete="name" aria-describedby="notice"><label for="new-email">Email</label><input id="new-email" name="email" type="email" required maxlength="254" autocomplete="email" aria-describedby="notice"><label for="new-password">Password</label><input id="new-password" name="password" type="password" required minlength="12" maxlength="128" autocomplete="new-password" aria-describedby="password-help notice"><p id="password-help">12–128 characters, including a letter and a number.</p><button disabled>Create account</button></form></section></div></main><script type="module" src="assets/auth.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <link rel="stylesheet" href="assets/app.css">
+  <title>DocuProcess Cloud | Your document workspace</title>
+</head>
+<body class="auth-page">
+<a class="skip-link" href="#main-content">Skip to content</a>
+<div class="auth-layout">
+  <section class="auth-story" aria-label="About DocuProcess Cloud">
+    <a class="brand" href="index.html" aria-label="DocuProcess Cloud home"><span class="brand-mark"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#layers"></use></svg></span><span>DocuProcess<span class="brand-subtitle">CLOUD</span></span></a>
+    <div class="story-copy"><span class="eyebrow">A LITTLE LESS PAPERWORK</span><h1>From documents<br>to <em>clarity.</em></h1><p>Keep your receipts and invoices together. Extract the details that matter, then review everything in one place.</p></div>
+    <div class="document-scene" aria-hidden="true"><div class="scene-grid"></div><div class="paper"><span class="paper-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#document"></use></svg></span><span class="paper-line paper-line--title"></span><span class="paper-line"></span><span class="paper-line paper-line--short"></span><div class="paper-divider"></div><span class="paper-line"></span><span class="paper-line paper-line--short"></span><span class="paper-check"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#check"></use></svg></span></div><span class="scene-label"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#scan"></use></svg> Ready for a closer look</span></div>
+    <ol class="workflow"><li><span>01</span>Upload</li><li><span>02</span>Extract</li><li><span>03</span>Review</li></ol>
+  </section>
+  <main class="auth-main" id="main-content">
+    <div class="auth-card">
+      <span class="eyebrow">YOUR DOCUMENT WORKSPACE</span>
+      <h2 id="auth-title">Welcome back.</h2><p class="muted" id="auth-description">Sign in to pick up where you left off.</p>
+      <div class="auth-tabs" role="tablist" aria-label="Account access">
+        <button id="login-tab" role="tab" aria-selected="true" aria-controls="login-panel" type="button">Sign in</button>
+        <button id="register-tab" role="tab" aria-selected="false" aria-controls="register-panel" tabindex="-1" type="button">Create account</button>
+      </div>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <div id="login-panel" role="tabpanel" aria-labelledby="login-tab">
+        <form method="post" id="login">
+          <div class="form-field"><label for="email">Email address</label><input id="email" name="email" type="email" placeholder="you@example.com" required maxlength="254" autocomplete="username" aria-describedby="notice"></div>
+          <div class="form-field"><label for="password">Password</label><div class="password-field"><input id="password" name="password" type="password" placeholder="Enter your password" required maxlength="128" autocomplete="current-password" aria-describedby="notice"><button class="password-toggle" type="button" data-password="password" aria-label="Show password" aria-pressed="false"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#eye"></use></svg></button></div></div>
+          <button class="button button--primary auth-submit" type="submit" disabled><span>Sign in</span><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+        </form>
+      </div>
+      <div id="register-panel" role="tabpanel" aria-labelledby="register-tab" hidden>
+        <form method="post" id="register">
+          <div class="form-field"><label for="full-name">Full name</label><input id="full-name" name="full_name" placeholder="Your name" required maxlength="200" autocomplete="name" aria-describedby="notice"></div>
+          <div class="form-field"><label for="new-email">Email address</label><input id="new-email" name="email" type="email" placeholder="you@example.com" required maxlength="254" autocomplete="email" aria-describedby="notice"></div>
+          <div class="form-field"><label for="new-password">Password</label><div class="password-field"><input id="new-password" name="password" type="password" placeholder="Create a password" required minlength="12" maxlength="128" autocomplete="new-password" aria-describedby="password-help notice"><button class="password-toggle" type="button" data-password="new-password" aria-label="Show password" aria-pressed="false"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#eye"></use></svg></button></div><p class="field-help" id="password-help">12–128 characters, with at least one letter and one number.</p></div>
+          <button class="button button--primary auth-submit" type="submit" disabled><span>Create account</span><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#arrow-right"></use></svg></button>
+        </form>
+      </div>
+      <p class="auth-footnote"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#lock"></use></svg> Your workspace is accessible after sign-in.</p>
+    </div>
+    <footer class="auth-footer"><span>DocuProcess Cloud</span><span>Upload. Extract. Understand.</span></footer>
+  </main>
+</div>
+<script type="module" src="assets/auth.js"></script>
+</body></html>

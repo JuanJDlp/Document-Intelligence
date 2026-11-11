@@ -37,3 +37,22 @@ The suite emits dependency deprecation warnings from Starlette/AnyIO and botocor
 Main requirement trace: API-AUTH-01..09, API-DOC-01..10, WRK-STM-02/03, WRK-CLM-01..06, WRK-PRC-01..07, WRK-PER-01..05, WRK-NOT-01..04, ENG-VAL/EXT/NRM/CHK/STS/OUT/LOG and TST-MK-01..08. Live counterparts remain subject to the sandbox checklist.
 
 The operator selected local-only verification. No AWS deployment, instance replacement, cloud scale-out, real SNS email, CloudTrail or alarm result is claimed by this record.
+
+
+## Frontend interaction checks
+
+The refreshed portal implements FE-UX-05/06, FE-AUTH-05, FE-UP-05, FE-HIST-04 and FE-DET-05/06. It retains the existing API and static-file deployment contracts.
+
+Reproduce with make demo:
+
+1. Use the arrow keys on the Sign in/Create account tabs. Toggle password visibility, register, and sign in. A normal logout must show the signed-out notice; an expired session must show the distinct expiration notice.
+2. Confirm the empty workspace. Select an empty file, an unsupported type and a file larger than 5 MiB; submission remains disabled with a readable explanation.
+3. Upload receipt.pdf with the file picker and receipt.png by drag and drop. Accepted documents appear immediately. Load missing-total.pdf and wait for Needs review.
+4. Search by filename, choose a status, clear the filters, and open a result. Search and summary counts refer only to loaded documents. Load more retains API cursor pagination.
+5. Review the exact currency/amount strings, missing fields, actual OCR confidence, review notes and processing details. An encrypted PDF is rejected by the API.
+6. At 360 px, check account navigation, document cards, file selection and detail layout. The page must not scroll horizontally.
+7. Repeat with sessionStorage blocked: navigation works with in-memory state; reloading requires another sign-in.
+
+Observed browser verification: the real local API/worker flow passed in both storage modes, using actual Tesseract on synthetic documents. Separate intercepted API fixtures verified list/detail failure and retry, pagination, partial/failed results without payloads, null fields, zero confidence, large exact money strings, issue-date timezone handling, text injection escaping and session expiration. These fixture checks are frontend behavior tests, not evidence of AWS service integration. No uncaught JavaScript or CSP errors were observed in the checked flows.
+
+The AWS identity check returned SESSION INVALID OR EXPIRED. Per the operator's choice, this iteration continued locally; deployed AWS resources and permissions remain unverified. Terraform static validation passed.

@@ -1,1 +1,56 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'"><link rel="stylesheet" href="assets/app.css"><title>Document dashboard</title></head><body><main><header><h1>Your documents</h1><button id="logout">Sign out</button></header><p id="notice" role="status"></p><section><h2>Upload a document</h2><form method="post" id="upload"><label for="file">One-page PDF, PNG or JPEG, up to 5 MiB</label><input id="file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required aria-describedby="notice"><button disabled>Upload document</button></form></section><section><h2>Processing history</h2><div class="table-wrap"><table><thead><tr><th>File</th><th>Uploaded</th><th>Status</th><th>Total</th></tr></thead><tbody id="history"></tbody></table></div><button id="more" hidden>Load more</button></section></main><script type="module" src="assets/dashboard.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <link rel="stylesheet" href="assets/app.css">
+  <title>Documents | DocuProcess Cloud</title>
+</head>
+<body class="workspace-page">
+<a class="skip-link" href="#main-content">Skip to content</a>
+<aside class="sidebar">
+  <a class="brand" href="dashboard.html" aria-label="DocuProcess Cloud home"><span class="brand-mark"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#layers"></use></svg></span><span>DocuProcess<span class="brand-subtitle">CLOUD</span></span></a>
+  <p class="nav-label">WORKSPACE</p>
+  <nav class="workspace-nav" aria-label="Workspace">
+    <a aria-label="Documents" class="nav-link is-active" href="dashboard.html" aria-current="page"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#folder"></use></svg><span>Documents</span><svg class="icon nav-chevron" aria-hidden="true" focusable="false"><use href="assets/icons.svg#chevron-right"></use></svg></a>
+    <a class="nav-link" href="dashboard.html#upload-panel"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#upload"></use></svg><span>Upload document</span></a>
+  </nav>
+  <div class="sidebar-note"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#scan"></use></svg><p>A clearer view of<br>your paperwork.</p></div>
+  <div class="account">
+    <span class="avatar" id="account-avatar" aria-hidden="true">·</span>
+    <div class="account-copy"><span id="account-name">Your account</span><span id="account-role">Document workspace</span></div>
+    <button class="icon-button logout" id="logout" type="button" disabled aria-label="Sign out" title="Sign out"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#logout"></use></svg></button>
+  </div>
+</aside>
+<div class="workspace">
+  <div class="topbar"><nav class="breadcrumbs" aria-label="Breadcrumb"><span>Workspace</span><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#chevron-right"></use></svg><span aria-current="page">Documents</span></nav><span class="topbar-caption"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#layers"></use></svg> Document workspace</span></div>
+  <main id="main-content" class="main-content">
+    <header class="page-header"><div><span class="eyebrow">YOUR WORKSPACE, IN ORDER</span><h1>Documents<span class="heading-dot">.</span></h1><p class="muted">A home for your receipts, invoices, and the details inside them.</p></div><a class="button button--primary" href="#upload-panel"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#plus"></use></svg> Upload document</a></header>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section class="stats-grid" aria-label="Summary of loaded documents">
+      <div class="stat-card"><span class="stat-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#folder"></use></svg></span><div><span class="stat-label">Documents loaded</span><strong id="stat-total">—</strong><span class="stat-note">In this view</span></div></div>
+      <div class="stat-card"><span class="stat-icon stat-icon--teal"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#activity"></use></svg></span><div><span class="stat-label">In progress</span><strong id="stat-processing">—</strong><span class="stat-note">Queued or processing</span></div></div>
+      <div class="stat-card"><span class="stat-icon stat-icon--amber"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#alert"></use></svg></span><div><span class="stat-label">Needs attention</span><strong id="stat-review">—</strong><span class="stat-note">Partial or failed results</span></div></div>
+    </section>
+    <section class="panel upload-panel" id="upload-panel" aria-labelledby="upload-heading">
+      <div class="upload-intro"><span class="section-kicker">START WITH A DOCUMENT</span><h2 id="upload-heading">Let’s take a closer look.</h2><p class="muted">Add a receipt or invoice. We’ll extract its details while you get on with your day.</p><span class="format-note"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#document"></use></svg> One-page PDF, PNG or JPEG · Up to 5 MiB</span></div>
+      <form method="post" id="upload" class="upload-form" aria-describedby="notice upload-help">
+        <div class="upload-field"><input class="visually-hidden" id="file" name="file" type="file" accept="application/pdf,image/png,image/jpeg" required aria-describedby="upload-help selected-file notice"><label class="dropzone" for="file" id="dropzone"><span class="upload-symbol"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#upload"></use></svg></span><strong>Choose a file <span>or drop it here</span></strong><span id="upload-help">PDF, PNG or JPEG · Maximum 5 MiB</span></label></div>
+        <div class="selected-file" id="selected-file" hidden><span class="file-type-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#document"></use></svg></span><div><strong id="selected-name"></strong><span id="selected-size"></span></div><button class="icon-button" id="clear-file" type="button" aria-label="Remove selected file"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#x"></use></svg></button></div>
+        <div class="upload-actions"><span class="field-help">One document at a time.</span><button class="button button--primary" type="submit" id="upload-submit" disabled><span>Process document</span><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#arrow-right"></use></svg></button></div>
+      </form>
+    </section>
+    <section class="panel history-panel" aria-labelledby="history-heading">
+      <div class="panel-heading"><div><h2 id="history-heading">Recent documents</h2><p class="muted">Follow progress and open any document to see its details.</p></div><button class="button button--secondary button--small" id="refresh" type="button"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#refresh"></use></svg> Refresh</button></div>
+      <div class="history-toolbar"><div class="search-field"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#search"></use></svg><label class="visually-hidden" for="search">Search loaded documents by filename</label><input id="search" type="search" placeholder="Search by filename…" autocomplete="off"></div><div class="filter-field"><label class="visually-hidden" for="status-filter">Filter loaded documents by status</label><select id="status-filter"><option value="ALL">All statuses</option><option value="PENDING">Pending</option><option value="RUNNING">Processing</option><option value="COMPLETED">Completed</option><option value="PARTIAL">Needs review</option><option value="FAILED">Failed</option></select></div></div>
+      <p class="history-count" id="history-count" aria-live="polite">Loading your documents…</p>
+      <div class="table-wrap" id="history-table" hidden><table><thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th><th scope="col">Status</th><th scope="col">Total</th><th scope="col"><span class="visually-hidden">Open document</span></th></tr></thead><tbody id="history"></tbody></table></div>
+      <div class="empty-state" id="history-state" role="status"><span class="empty-icon"><svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#folder"></use></svg></span><h3 id="history-state-title">Getting your workspace ready</h3><p id="history-state-description">Your documents will appear here in a moment.</p><button class="button button--secondary button--small" id="history-retry" type="button" hidden>Try again</button><button class="button button--secondary button--small" id="clear-filters" type="button" hidden>Clear filters</button></div>
+      <div class="history-footer"><span class="field-help">Search and summaries cover loaded documents.</span><button class="button button--secondary button--small" id="more" type="button" hidden>Load more <svg class="icon" aria-hidden="true" focusable="false"><use href="assets/icons.svg#arrow-down"></use></svg></button></div>
+    </section>
+    <footer class="workspace-footer"><span>DocuProcess Cloud</span><span>A clearer view of your documents.</span></footer>
+  </main>
+</div>
+<script type="module" src="assets/dashboard.js"></script>
+</body></html>

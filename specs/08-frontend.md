@@ -26,23 +26,28 @@ Implementation: `app/frontend/`. Static files only: HTML, CSS, and vanilla JavaS
 - **FE-AUTH-02** (active) Every API call sends `Authorization: Bearer <token>`. A `401` response clears the token and redirects to `index.html` with a message.
 - **FE-AUTH-03** (active) Registration validates the same rules as the API (`API-AUTH-02`, `API-AUTH-03`) client-side for better feedback. The server remains authoritative.
 - **FE-AUTH-04** (active) Tokens are not stored in `localStorage`. Storage access is wrapped in try/catch and the app works (with login required each time) when storage is unavailable.
+- **FE-AUTH-05** (active) Sign-in and registration panels use accessible tabs with arrow-key navigation. Password visibility can be toggled without changing the submitted value. A deliberate logout has a signed-out message, distinct from session expiration.
 
 ### 3.2 Upload
 - **FE-UP-01** (active) Upload form accepts one file, with `accept="application/pdf,image/png,image/jpeg"`.
 - **FE-UP-02** (active) Client-side check of size ≤ 5 MiB and type before sending. Server validation is authoritative.
 - **FE-UP-03** (active) On `202`, the page shows the new document in the history list with status `PENDING` and offers a link to its detail page.
 - **FE-UP-04** (active) Errors show the API `error.message` text. No stack traces, no raw JSON.
+- **FE-UP-05** (active) A drop zone and the native file input use the same one-file size/type validation. The selected filename/size, clear action and busy submission state are visible. The accepted API response appears immediately in history, even before an eventually consistent listing includes it.
 
 ### 3.3 History
 - **FE-HIST-01** (active) The history table shows: filename, uploaded time, status badge, total amount with currency (when `result` present). Newest first.
 - **FE-HIST-02** (active) "Load more" uses `next_cursor`.
 - **FE-HIST-03** (active) The list refreshes every 10 seconds while any visible item is `PENDING` or `RUNNING`, and stops when all are terminal.
+- **FE-HIST-04** (active) Filename search and status filtering operate on loaded documents only. The UI states this scope and keeps API cursor pagination available. Manual refresh can recover from a failed list request.
 
 ### 3.4 Document detail
 - **FE-DET-01** (active) Shows processing status, attempts, last error (if any), and the full extraction result: fields, line items, confidence, warnings.
 - **FE-DET-02** (active) Polls `GET /api/v1/documents/{id}` every 5 seconds while `RUNNING` or `PENDING`, up to 5 minutes, then shows "Still processing. Refresh later."
 - **FE-DET-03** (active) Null fields are displayed as "Not found" (not blank, not "0").
 - **FE-DET-04** (active) Money is displayed with the currency code and the string value exactly as returned (no float conversion in JavaScript).
+- **FE-DET-05** (active) Detail summarizes the extracted total, merchant, issue date and provider confidence, while retaining all contract fields, line items, warnings and processing details. Confidence indicators use provider values only; absent values remain unavailable.
+- **FE-DET-06** (active) Manual refresh is available after a network error or the automatic polling deadline. Pending and failed documents show actionable messages; terminal engine errors remain visible even when no result exists.
 
 ## 4. Accessibility and layout
 
@@ -50,6 +55,9 @@ Implementation: `app/frontend/`. Static files only: HTML, CSS, and vanilla JavaS
 - **FE-UX-02** (active) Forms have associated `<label>` elements, visible focus styles, and error messages linked with `aria-describedby`.
 - **FE-UX-03** (active) Status is never conveyed by color alone; badges include text.
 - **FE-UX-04** (active) No external fonts, scripts, or trackers. Everything is served from the same CloudFront origin or inline.
+
+- **FE-UX-05** (active) Authenticated pages share workspace navigation and an account label obtained from /me. The visual hierarchy uses consistent typography, spacing, surfaces and status badges.
+- **FE-UX-06** (active) Loading, empty, filtered-empty, success and recoverable-error states are explicit. Counters summarize loaded documents only and never imply a server-wide total.
 
 ## 5. Security
 
@@ -65,9 +73,11 @@ app/frontend/
   document.html
   assets/
     app.css
-    api.js          # fetch wrapper, token handling, error mapping
-    auth.js         # login, register, logout, guard
-    dashboard.js    # upload, history
+    api.js          # fetch, tokens, notices, logout and memory navigation
+    ui.js           # workspace identity, status badges, buttons and confidence
+    icons.svg       # same-origin icon sprite
+    auth.js         # accessible auth tabs, login and registration
+    dashboard.js    # upload, history, local search and status filters
     document.js     # detail, polling
     format.js       # date and money display helpers (no float math)
 ```
