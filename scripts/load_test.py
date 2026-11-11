@@ -4,6 +4,10 @@ Registers one synthetic user, then runs concurrent login/logout pairs against th
 public CloudFront URL. Each login verifies an Argon2id hash, so the traffic is
 CPU-bound on the instances and drives the ASG target-tracking policy (CPU 60 %).
 Every 30 s it prints request counts, ASG capacity and ASG average CPU.
+
+Keep LOAD_WORKERS low (default 4, about 2 concurrent logins per instance). Each Argon2id
+verification allocates 64 MiB; on a 1 GiB t3.micro, 24 workers exhausted memory, the API
+process was killed and the ALB returned 502 instead of raising CPU (observed 2026-11-10).
 Prints no tokens, passwords or response bodies.
 """
 
@@ -94,7 +98,7 @@ def run() -> None:
     if not asg_name:
         raise RuntimeError("Set LOAD_ASG_NAME to the Auto Scaling group name")
     minutes = env_int("LOAD_MINUTES", 10)
-    workers = env_int("LOAD_WORKERS", 24)
+    workers = env_int("LOAD_WORKERS", 4)
 
     credentials = register(base)
     stop = threading.Event()

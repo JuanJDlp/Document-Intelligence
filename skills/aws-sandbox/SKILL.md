@@ -75,4 +75,6 @@ The sandbox is torn down and recreated often. Each new lab session brings new cr
 - `iam:GetRole` works for the instance role. It is denied for the lab role's own policies (explicit deny on `voclabs`).
 - `ec2:RunInstances` is explicitly denied for `gp3` volumes for the lab role. A launch template must map the root volume as `gp2` (`ADR-034`).
 - `servicequotas:GetServiceQuota` is denied.
+- `ec2:MonitorInstances` (detailed monitoring) is explicitly denied (2026-11-10). EC2 and ASG CPU metrics arrive every 5 minutes, so target-tracking scale-out takes about 8–12 minutes of sustained load.
+- `autoscaling:StartInstanceRefresh` is denied by a service control policy (2026-11-10, `ADR-039`).
 - Dry-run probes (`--dry-run`) validate permissions without creating anything. Use them before any real call. Real tests that create resources need the user's approval.
