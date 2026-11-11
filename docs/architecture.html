@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocuProcess Architecture</title>
+<meta name="description" content="Visual architecture of DocuProcess Cloud on the AWS Academy sandbox: topology, request flow, job lifecycle, instance bootstrap, security groups and data placement.">
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-subtle: #f6f7f9;
+  --surface: #ffffff;
+  --text: #16191f;
+  --muted: #5f6b7a;
+  --border: #d5dbe1;
+  --line: #545b64;
+  --accent: #8c4fff;
+  --teal: #00838a;
+  --orange: #c45500;
+  --pink: #c7106a;
+  --green: #5a7a10;
+  --cloud-stroke: #232f3e;
+  --region-stroke: #00a4a6;
+  --vpc-stroke: #8c4fff;
+  --az-stroke: #147eba;
+  --public-fill: #f2f8e8;
+  --public-stroke: #7aa116;
+  --private-fill: #e6f6f7;
+  --private-stroke: #00a4a6;
+  --asg-stroke: #ed7100;
+  --cfn-stroke: #e7157b;
+  --band: #f4f6f8;
+  --st-pending: #eef1f4;
+  --st-running: #e3effc;
+  --st-completed: #e6f4ea;
+  --st-partial: #fff4dc;
+  --st-failed: #fde8e8;
+  --st-pending-s: #7d8998;
+  --st-running-s: #147eba;
+  --st-completed-s: #1d8102;
+  --st-partial-s: #b46b00;
+  --st-failed-s: #d13212;
+  --shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 1px 1px rgba(15, 23, 42, .04);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1419;
+    --bg-subtle: #161c23;
+    --surface: #161c23;
+    --text: #e6e9ed;
+    --muted: #9aa5b1;
+    --border: #2c3540;
+    --line: #aab3bd;
+    --accent: #b28cff;
+    --teal: #4fd1d3;
+    --orange: #ff9a3c;
+    --pink: #ff6fb1;
+    --green: #a7cf4a;
+    --cloud-stroke: #aab3bd;
+    --region-stroke: #2bc4c6;
+    --vpc-stroke: #a77bff;
+    --az-stroke: #4fa3dc;
+    --public-fill: #18220e;
+    --public-stroke: #7aa116;
+    --private-fill: #0d2324;
+    --private-stroke: #1a9a9c;
+    --asg-stroke: #ff8a1f;
+    --cfn-stroke: #ff4f9d;
+    --band: #141a20;
+    --st-pending: #1f262e;
+    --st-running: #10263a;
+    --st-completed: #12291a;
+    --st-partial: #2e2410;
+    --st-failed: #331717;
+    --st-pending-s: #9aa5b1;
+    --st-running-s: #4fa3dc;
+    --st-completed-s: #4cc35a;
+    --st-partial-s: #f0a830;
+    --st-failed-s: #ff6b57;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1419;
+  --bg-subtle: #161c23;
+  --surface: #161c23;
+  --text: #e6e9ed;
+  --muted: #9aa5b1;
+  --border: #2c3540;
+  --line: #aab3bd;
+  --accent: #b28cff;
+  --teal: #4fd1d3;
+  --orange: #ff9a3c;
+  --pink: #ff6fb1;
+  --green: #a7cf4a;
+  --cloud-stroke: #aab3bd;
+  --region-stroke: #2bc4c6;
+  --vpc-stroke: #a77bff;
+  --az-stroke: #4fa3dc;
+  --public-fill: #18220e;
+  --public-stroke: #7aa116;
+  --private-fill: #0d2324;
+  --private-stroke: #1a9a9c;
+  --asg-stroke: #ff8a1f;
+  --cfn-stroke: #ff4f9d;
+  --band: #141a20;
+  --st-pending: #1f262e;
+  --st-running: #10263a;
+  --st-completed: #12291a;
+  --st-partial: #2e2410;
+  --st-failed: #331717;
+  --st-pending-s: #9aa5b1;
+  --st-running-s: #4fa3dc;
+  --st-completed-s: #4cc35a;
+  --st-partial-s: #f0a830;
+  --st-failed-s: #ff6b57;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+main { max-width: 1180px; margin: 0 auto; padding: 32px 16px 64px; }
+header.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -.01em; }
+h2 { font-size: 21px; margin: 48px 0 6px; letter-spacing: -.005em; }
+h3 { font-size: 16px; margin: 20px 0 6px; }
+p { margin: 8px 0; }
+.lede { color: var(--muted); max-width: 760px; margin: 0; }
+.section-intro { color: var(--muted); max-width: 820px; margin: 0 0 14px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+a { color: var(--accent); }
+
+.theme-toggle { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 0; }
+nav.toc a { font-size: 13px; text-decoration: none; color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; background: var(--surface); }
+nav.toc a:hover { border-color: var(--accent); }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 24px 0 0; }
+.fact { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--surface); box-shadow: var(--shadow); }
+.fact b { display: block; font-size: 15px; }
+.fact span { color: var(--muted); font-size: 13px; }
+
+figure { margin: 14px 0 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+figure .scroll { overflow-x: auto; padding: 12px; }
+figure svg { display: block; width: 100%; height: auto; }
+figure svg.wide { min-width: 980px; }
+figure svg.mid { min-width: 760px; }
+figcaption { border-top: 1px solid var(--border); padding: 10px 14px; font-size: 13px; color: var(--muted); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend svg { width: 38px; height: 10px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-top: 12px; background: var(--surface); }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--bg-subtle); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin-top: 12px; }
+.card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.card h3 { margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+.card h3 svg { width: 32px; height: 32px; flex: none; }
+.card ul { margin: 8px 0 0; padding-left: 18px; }
+.card li { margin: 3px 0; }
+.card .why { color: var(--muted); font-size: 13.5px; margin-top: 10px; }
+
+.sg-chain { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin-top: 12px; }
+.sg { flex: 1 1 180px; border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); box-shadow: var(--shadow); min-width: 0; }
+.sg .name { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; }
+.sg .who { color: var(--muted); font-size: 13px; }
+.sg .rule { font-size: 13px; margin-top: 8px; }
+.sg-arrow { flex: 0 0 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); text-align: center; }
+.sg-arrow::after { content: "→"; font-size: 22px; color: var(--line); line-height: 1; }
+
+.boot { list-style: none; counter-reset: step; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.boot li { counter-increment: step; border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 12px 46px; position: relative; background: var(--surface); font-size: 14px; }
+.boot li::before { content: counter(step); position: absolute; left: 12px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--orange); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.boot li b { display: block; }
+.boot li span { color: var(--muted); font-size: 13px; }
+
+.instance { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; border: 2px solid var(--asg-stroke); border-radius: 12px; padding: 14px; position: relative; }
+.instance-title { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.instance-title svg { width: 30px; height: 30px; }
+.instance-title small { font-weight: 400; color: var(--muted); }
+.svc { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; background: var(--bg-subtle); }
+.svc h4 { margin: 0 0 6px; font-size: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.svc p { font-size: 13.5px; margin: 4px 0; }
+.svc .lib { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 13px; }
+
+.status { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+.status .card h3 { font-size: 15px; }
+.pill { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.pill.ok { background: var(--st-completed); color: var(--st-completed-s); }
+.pill.no { background: var(--st-partial); color: var(--st-partial-s); }
+
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+
+/* SVG vocabulary */
+svg text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; fill: var(--text); }
+.g-cloud { fill: none; stroke: var(--cloud-stroke); stroke-width: 1.5; }
+.g-region { fill: none; stroke: var(--region-stroke); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.g-vpc { fill: none; stroke: var(--vpc-stroke); stroke-width: 1.5; }
+.g-az { fill: none; stroke: var(--az-stroke); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.g-pub { fill: var(--public-fill); stroke: var(--public-stroke); stroke-width: 1; }
+.g-priv { fill: var(--private-fill); stroke: var(--private-stroke); stroke-width: 1; }
+.g-asg { fill: none; stroke: var(--asg-stroke); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.g-cfn { fill: none; stroke: var(--cfn-stroke); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.gl { font-size: 12.5px; font-weight: 700; }
+.gl.teal { fill: var(--teal); }
+.gl.purple { fill: var(--accent); }
+.gl.pink { fill: var(--pink); }
+.azl { font-size: 11px; font-weight: 600; fill: var(--az-stroke); }
+.sl { font-size: 9px; font-weight: 700; letter-spacing: .06em; fill: var(--muted); }
+.sc { font-size: 10px; fill: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.nl { font-size: 12px; font-weight: 650; text-anchor: middle; }
+.ns { font-size: 10.5px; fill: var(--muted); text-anchor: middle; }
+.ns.start, .nl.start { text-anchor: start; }
+.al { font-size: 10.5px; fill: var(--text); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.al.mid { text-anchor: middle; }
+.al.muted { fill: var(--muted); }
+.al.purple { fill: var(--accent); }
+.al.pink { fill: var(--pink); }
+.al b, .al .n { font-weight: 700; }
+.edge { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.edge.dash { stroke-dasharray: 5 4; }
+.edge.out { stroke: var(--accent); stroke-dasharray: 2 4; stroke-width: 1.8; stroke-linecap: round; }
+.edge.alarm { stroke: var(--pink); }
+.edge.off { stroke-dasharray: 5 4; opacity: .6; }
+.mk { fill: var(--line); }
+.mk.purple { fill: var(--accent); }
+.mk.pink { fill: var(--pink); }
+.disabled { opacity: .5; }
+.muted-t { fill: var(--muted); font-size: 10.5px; text-anchor: middle; font-style: italic; }
+
+.lane-head { font-size: 12px; font-weight: 700; text-anchor: middle; }
+.lane-sub { font-size: 10.5px; fill: var(--muted); text-anchor: middle; }
+.lifeline { stroke: var(--border); stroke-width: 1.4; stroke-dasharray: 4 4; }
+.band { fill: var(--band); }
+.band-l { font-size: 11px; font-weight: 700; letter-spacing: .08em; fill: var(--muted); }
+.msg { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.msg.ret { stroke-dasharray: 5 4; }
+.ml { font-size: 11px; text-anchor: middle; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.ml.end { text-anchor: end; }
+.ml.start { text-anchor: start; }
+.num { fill: var(--accent); font-weight: 800; }
+.badge-c { fill: var(--accent); }
+.badge-t { fill: #fff; font-size: 10px; font-weight: 800; text-anchor: middle; }
+.engine-box { fill: var(--bg-subtle); stroke: var(--line); stroke-width: 1.4; }
+.engine-t { font: 700 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--text); text-anchor: middle; }
+
+.st rect { stroke-width: 1.6; }
+.st text { font-size: 13px; font-weight: 700; text-anchor: middle; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.st-pending rect { fill: var(--st-pending); stroke: var(--st-pending-s); } .st-pending text { fill: var(--st-pending-s); }
+.st-running rect { fill: var(--st-running); stroke: var(--st-running-s); } .st-running text { fill: var(--st-running-s); }
+.st-completed rect { fill: var(--st-completed); stroke: var(--st-completed-s); } .st-completed text { fill: var(--st-completed-s); }
+.st-partial rect { fill: var(--st-partial); stroke: var(--st-partial-s); } .st-partial text { fill: var(--st-partial-s); }
+.st-failed rect { fill: var(--st-failed); stroke: var(--st-failed-s); } .st-failed text { fill: var(--st-failed-s); }
+.users-ic { color: var(--text); }
+
+@media (max-width: 640px) {
+  h1 { font-size: 24px; }
+  .sg-arrow { flex-basis: 100%; padding: 4px 0; }
+  .sg-arrow::after { content: "↓"; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><symbol id="i-cloudfront" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#8c4fff" d="M0 0h64v64H0z"/><path fill="#fff" d="M41.5 43.5c-1.103 0-2-.897-2-2s.897-2 2-2 2 .897 2 2-.897 2-2 2m0-6c-2.206 0-4 1.794-4 4s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4m-19-5c-1.103 0-2-.897-2-2s.897-2 2-2 2 .897 2 2-.897 2-2 2m0-6c-2.206 0-4 1.794-4 4s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4m22.889 20.624a29 29 0 0 0-.704-1.533l-1.789.895c.274.549.524 1.113.76 1.679a19 19 0 0 1-2.628 1.575c.356-.875.666-1.765.946-2.728l-1.92-.558a25.2 25.2 0 0 1-1.87 4.679A19.2 19.2 0 0 1 32.5 52c-3.035 0-5.933-.686-8.629-2.024-1.368-3.361-2.033-6.442-2.033-9.417 0-1.292.225-2.363.484-3.603q.096-.455.192-.932l-1.963-.386q-.092.465-.186.907c-.271 1.293-.527 2.515-.527 4.014 0 2.515.436 5.085 1.316 7.795A19.46 19.46 0 0 1 13 32.5c0-.111.01-.227.012-.339a24 24 0 0 1 4.842-.59l-.05-1.999c-1.635.04-3.11.207-4.641.512.918-7.401 6.049-13.69 13.16-16.065 1.55.799 2.697 1.505 3.812 2.351l1.209-1.594a24 24 0 0 0-2.198-1.477A19.6 19.6 0 0 1 32.5 13c2.532 0 5.032.494 7.349 1.439a33 33 0 0 0-1.606.532l.68 1.881c1.393-.503 2.485-.812 3.648-1.031C48.399 19.341 52 25.667 52 32.5a19.36 19.36 0 0 1-6.611 14.624m-2.381-33.375A21.4 21.4 0 0 0 32.5 11c-2.108 0-4.176.301-6.143.895-8.634 2.569-14.789 10.335-15.312 19.301-.035.429-.045.866-.045 1.304a21.47 21.47 0 0 0 11.354 18.955A21.54 21.54 0 0 0 32.5 54a21.1 21.1 0 0 0 6.937-1.157 21 21 0 0 0 6.209-3.336C50.955 45.399 54 39.2 54 32.5a21.52 21.52 0 0 0-10.992-18.751m-4.624 23.662-1.381 1.447c-2.981-2.843-5.956-4.712-9.366-5.883l.65-1.892c3.692 1.268 6.901 3.279 10.097 6.328m.06-15.047c2.838 4.328 4.436 9.08 4.749 14.124l-1.996.124c-.292-4.693-1.78-9.117-4.425-13.152zm-11.993 4.433-1.678-1.089c1.543-2.376 2.866-3.95 4.563-5.43l1.314 1.508c-1.547 1.349-2.764 2.801-4.199 5.011M34.5 16.5c1.103 0 2 .897 2 2s-.897 2-2 2-2-.897-2-2 .897-2 2-2m0 6c2.206 0 4-1.794 4-4s-1.794-4-4-4-4 1.794-4 4 1.794 4 4 4"/></g></symbol><symbol id="i-s3" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#7aa116" d="M0 0h64v64H0z"/><path fill="#fff" d="m47.759 33.948.234-1.817c2.173 1.254 2.849 1.99 3.044 2.293-.324.061-1.205.085-3.278-.476M30.499 21c-10.374 0-17.117-2.512-17.5-4.304v-.185c.35-1.119 6.14-4.51 17.5-4.51 11.34 0 17.133 3.38 17.5 4.504v.111C47.725 18.446 40.962 21 30.5 21m15.319 12.362c-4.765-1.565-10.906-4.383-13.224-5.474a2.09 2.09 0 0 0-2.082-1.982A2.097 2.097 0 0 0 28.418 28c0 1.154.94 2.094 2.094 2.094.457 0 .877-.152 1.22-.4 2.4 1.128 8.887 4.104 13.826 5.686l-1.721 13.344C43.583 50.352 38.919 52 30.497 52c-8.425 0-13.092-1.648-13.342-3.249l-3.72-28.937C16.945 21.915 23.749 23 30.5 23c6.75 0 13.554-1.085 17.065-3.185zM50 16.5c0-3.069-8.34-6.5-19.5-6.5S11 13.431 11 16.5v.543l4.174 31.99C15.874 53.516 26.123 54 30.497 54c4.372 0 14.616-.484 15.32-4.993l1.684-13.06c1.277.332 2.31.51 3.115.508.99 0 1.657-.252 2.08-.758.35-.416.489-.94.389-1.476-.228-1.22-1.682-2.509-4.715-4.177l-.1-.055L50 17.044z"/></g></symbol><symbol id="i-elb" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#8c4fff" d="M0 0h64v64H0z"/><path fill="#fff" d="M23.5 42C17.71 42 13 37.29 13 31.5S17.71 21 23.5 21 34 25.71 34 31.5 29.29 42 23.5 42M48 48c0 1.654-1.346 3-3 3s-3-1.346-3-3 1.346-3 3-3 3 1.346 3 3m-3-35c1.654 0 3 1.346 3 3s-1.346 3-3 3-3-1.346-3-3 1.346-3 3-3m3 16c1.654 0 3 1.346 3 3s-1.346 3-3 3-3-1.346-3-3 1.346-3 3-3m-12.099 4h7.201A5.01 5.01 0 0 0 48 37c2.757 0 5-2.243 5-5s-2.243-5-5-5a5.01 5.01 0 0 0-4.898 4h-7.127a12.5 12.5 0 0 0-.879-4.144l7.703-6.389A4.94 4.94 0 0 0 45 21c2.757 0 5-2.243 5-5s-2.243-5-5-5-5 2.243-5 5c0 1.224.459 2.331 1.191 3.201l-7.019 5.823C31.977 21.42 28.021 19 23.5 19 16.607 19 11 24.607 11 31.5S16.607 44 23.5 44c4.243 0 7.993-2.129 10.254-5.371l7.437 6.17C40.459 45.669 40 46.776 40 48c0 2.757 2.243 5 5 5s5-2.243 5-5-2.243-5-5-5a4.94 4.94 0 0 0-2.201.533l-8.029-6.66c.574-1.2.966-2.5 1.131-3.873"/></g></symbol><symbol id="i-ec2" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#ed7100" d="M0 0h64v64H0z"/><path fill="#fff" d="M22 41h19V23H22zm21-18h3v2h-3v2h3v2h-3v2h3v2h-3v3h3v2h-3v2h3v2h-3.137c-.255.587-.84 1-1.519 1H41v3h-2v-3h-2v3h-2v-3h-2v3h-2v-3h-2v3h-2v-3h-3v3h-2v-3h-.344a1.66 1.66 0 0 1-1.519-1H18v-2h2v-2h-2v-2h2v-3h-2v-2h2v-2h-2v-2h2v-2h-2v-2h2v-.344c0-.913.743-1.656 1.656-1.656H22v-3h2v3h3v-3h2v3h2v-3h2v3h2v-3h2v3h2v-3h2v3h.344c.913 0 1.656.743 1.656 1.656zM32 52H12V32h4v-2h-4.157A1.845 1.845 0 0 0 10 31.843v20.314c0 1.016.826 1.843 1.843 1.843h20.314A1.845 1.845 0 0 0 34 52.157V48h-2zm22-40.157v20.314A1.845 1.845 0 0 1 52.157 34H48v-2h4V12H32v4h-2v-4.157c0-1.016.826-1.843 1.843-1.843h20.314c1.017 0 1.843.827 1.843 1.843"/></g></symbol><symbol id="i-asg" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#ed7100" d="M0 0h64v64H0z"/><path fill="#fff" d="M54 31.43h-7.4l3.31-3.31L48.49 26.7l-5.736 5.737 5.736 5.738 1.421-1.422-3.31-3.31H54zm-39.91-3.31 3.31 3.31H10v2.012h7.4l-3.31 3.31 1.421 1.422 5.736-5.738-5.736-5.737zm11.767 11.354h12.061V27.409H25.857zm14.071-13.07h2.01v2.01h-2.01v2.011h2.01v2.011h-2.01v2.01h2.01v2.012h-2.01v2.01h2.01v2.011h-2.01v-.695c0 .938-.763 1.7-1.698 1.7h.693v2.011h-2.01v-2.01h-2.01v2.01h-2.01v-2.01h-2.01v2.01h-2.01v-2.01h-2.011v2.01h-2.01v-2.01h.693a1.7 1.7 0 0 1-1.699-1.7v.694h-2.01v-2.01h2.01v-2.011h-2.01v-2.011h2.01v-2.01h-2.01v-2.012h2.01v-2.01h-2.01v-2.011h2.01v.695c0-.938.763-1.7 1.7-1.7h-.694v-2.011h2.01v2.01h2.01v-2.01h2.01v2.01h2.01v-2.01h2.01v2.01h2.011v-2.01h2.01v2.01h-.693c.935 0 1.698.763 1.698 1.7zm-7.035 23.748V44.5h-2.01v5.652l-3.601-3.602-1.421 1.422L31.887 54l6.027-6.028-1.421-1.422zm-5.688-32.765-1.267-1.562L31.888 11l5.949 4.825-1.267 1.562-3.677-2.983v6.973h-2.01v-6.973z"/></g></symbol><symbol id="i-rds" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#c925d1" d="M0 0h64v64H0z"/><path fill="#fff" d="M54 11v8h-2v-5.586l-6.293 6.293-1.414-1.414L50.586 12h-5.461v-2H53a1 1 0 0 1 1 1m-42 7.875h-2V11a1 1 0 0 1 1-1h8v2h-5.586l6.293 6.293-1.414 1.414L12 13.414zm7.707 26.832L13.414 52h5.461v2H11a1 1 0 0 1-1-1v-8h2v5.586l6.293-6.293zM51.5 31.781c0-2.429-2.866-4.849-7.667-6.474l.641-1.894c5.736 1.941 9.026 4.991 9.026 8.368s-3.29 6.427-9.026 8.369l-.641-1.895c4.801-1.624 7.667-4.045 7.667-6.474m-38.957 0c0 2.324 2.681 4.679 7.172 6.3l-.68 1.88c-5.396-1.947-8.492-4.928-8.492-8.18s3.096-6.233 8.492-8.18l.68 1.881c-4.491 1.621-7.172 3.976-7.172 6.299M52 45.125h2V53a1 1 0 0 1-1 1h-8v-2h5.586l-6.293-6.293 1.414-1.414L52 50.586zM32.022 31.402c-5.023 0-7.896-1.343-8.022-1.919v-3.226c2.159 1.009 5.609 1.336 8 1.336s5.841-.327 8-1.336v3.226c-.106.574-2.949 1.919-7.978 1.919m0 5.728c-5.023 0-7.896-1.344-8.022-1.92v-3.254c1.953.981 5.055 1.446 8.022 1.446 2.951 0 6.033-.464 7.978-1.442v3.25c-.106.575-2.948 1.92-7.978 1.92M32 42.268c-5.05 0-7.896-1.351-8-1.922v-2.663c1.953.982 5.055 1.447 8.022 1.447 2.951 0 6.033-.464 7.978-1.443v2.655c-.104.575-2.95 1.926-8 1.926m0-20.075c4.971 0 7.642 1.177 7.982 1.701-.34.523-3.011 1.699-7.982 1.699-5.091 0-7.767-1.232-8-1.644v-.019c.233-.504 2.909-1.737 8-1.737m0-2c-3.714 0-10 .78-10 3.701v16.452c0 2.695 5.184 3.922 10 3.922s10-1.227 10-3.922V23.894c0-2.921-6.286-3.701-10-3.701"/></g></symbol><symbol id="i-ddb" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#c925d1" d="M0 0h64v64H0z"/><path fill="#fff" d="M46.586 25.25H43a1 1 0 0 1-.822-.435 1.02 1.02 0 0 1-.114-.931l2.493-6.722h-8.913l-4.091 9.098H36c.32 0 .623.156.812.42.187.264.239.602.136.91l-3.66 11.101zm3.12-.297L31.709 43.15a.99.99 0 0 1-1.232.146 1.014 1.014 0 0 1-.423-1.18l4.56-13.833H30a1 1 0 0 1-.841-.463 1.02 1.02 0 0 1-.07-.966l5-11.12a1 1 0 0 1 .91-.593h11c.329 0 .636.163.823.435.187.273.23.62.115.931l-2.494 6.721H49a1 1 0 0 1 .924.624c.155.378.069.813-.217 1.102M41.002 44.22c-2.71 1.886-7.687 2.882-12.468 2.882-4.816 0-9.837-1.01-12.533-2.924l.001 3.816c0 1.664 4.768 3.984 12.532 3.984 7.495 0 12.468-2.702 12.468-4.49zm2.064-3.27c0 .187-.032.367-.064.546v5.993C43 51.079 36.51 54 28.533 54c-6.903 0-13.871-1.89-14.473-5.5h-.059L14 43.445V16.151h.001c0-3.996 7.487-6.151 14.532-6.151 3.94 0 7.73.64 10.397 1.756l-.766 1.868c-2.432-1.019-5.943-1.602-9.631-1.602-7.764 0-12.532 2.405-12.532 4.13 0 1.724 4.768 4.129 12.532 4.129.195 0 .399 0 .596-.007l.078 2.02c-.225.009-.45.009-.674.009-4.817 0-9.837-1.01-12.533-2.924v4.358h.001v.017c.005.53.489 1.143 1.364 1.72 1.982 1.288 5.55 2.168 9.539 2.351l-.091 2.02c-4.126-.19-7.75-1.069-10.086-2.416-.31.298-.726 1.056-.726 1.467 0 1.724 4.768 4.129 12.532 4.129.738 0 1.465-.025 2.162-.075l.14 2.017c-.743.054-1.518.08-2.302.08-4.817 0-9.837-1.009-12.533-2.924v3.67h.001c.005.547.489 1.16 1.364 1.737 2.268 1.474 6.549 2.393 11.168 2.393h.33v2.022h-.33c-4.778 0-9.86-1.008-12.532-2.543-.322.298 0 1.01 0 1.548 0 1.725 4.768 4.13 12.532 4.13s12.532-2.405 12.532-4.13c0-.61-.6-1.174-1.092-1.538-.41.247-.86.483-1.372.7l-.768-1.868c.53-.223.99-.463 1.364-.711 1.1-.734 1.804-1.779 1.804-2.175h2c0 .94-.621 1.947-1.417 2.775 1.192 1.04 1.48 2.078 1.48 2.817M17.142 48.39c.791.408 1.716.772 2.752 1.08l.564-1.94a14 14 0 0 1-2.406-.94zm2.752-11.05.564-1.94c-.916-.272-1.726-.589-2.406-.94l-.91 1.799c.791.41 1.716.772 2.752 1.08m-2.752-13.21.91-1.801c.68.352 1.49.668 2.406.94l-.564 1.94a16 16 0 0 1-2.752-1.08"/></g></symbol><symbol id="i-sns" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#e7157b" d="M0 0h64v64H0z"/><path fill="#fff" d="M14 31a1.001 1.001 0 0 1 0 2 1.001 1.001 0 0 1 0-2m19.396 20c-8.888 0-16.574-6.919-18.244-16.232A3 3 0 0 0 16.815 33H22v-2h-5.185a3 3 0 0 0-1.66-1.768C16.776 20.49 24.451 14 33.396 14c4.191 0 7.192.844 10.033 2.821l1.142-1.642C41.411 12.98 37.965 12 33.396 12c-10.002 0-18.57 7.322-20.255 17.14A2.99 2.99 0 0 0 11 32c0 1.353.906 2.486 2.139 2.859C14.88 45.248 23.456 53 33.396 53c4.232 0 8.333-1.409 12.189-4.189l-1.17-1.622C40.907 49.718 37.199 51 33.396 51m-8.334-21.541c1.395.378 3.029.541 4.372.541 1.282 0 2.826-.145 4.184-.474l-3.513 7.027A1 1 0 0 0 30 37v3.501a26 26 0 0 0-.399.331c-.394.33-1.169.981-1.601 1.142V37q0-.192-.071-.372zM29.434 26c2.599 0 4.581.566 5.335 1-.754.434-2.736 1-5.335 1-2.695 0-4.533-.601-5.216-1 .683-.399 2.521-1 5.216-1M27 44h1q.065 0 .128-.008c.966-.125 1.918-.924 2.758-1.628.259-.217.486-.412.66-.526.283-.185.454-.5.454-.838v-3.764l4.592-9.183c.258-.308.408-.657.408-1.053 0-2.201-4.525-3-7.566-3-2.989 0-7.434.799-7.434 3 0 .317.101.601.268.862L26 37.192V43a1 1 0 0 0 1 1m22-1a1.001 1.001 0 0 1 0 2 1.001 1.001 0 0 1 0-2m0-24a1.001 1.001 0 0 1 0 2 1.001 1.001 0 0 1 0-2m2 12a1.001 1.001 0 0 1 0 2 1.001 1.001 0 0 1 0-2m-7 2h4.185A2.99 2.99 0 0 0 51 35c1.654 0 3-1.346 3-3s-1.346-3-3-3a2.99 2.99 0 0 0-2.815 2H44V21h2.185A2.99 2.99 0 0 0 49 23c1.654 0 3-1.346 3-3s-1.346-3-3-3a2.99 2.99 0 0 0-2.815 2H43a1 1 0 0 0-1 1v11h-5v2h5v11a1 1 0 0 0 1 1h3.185A2.99 2.99 0 0 0 49 47c1.654 0 3-1.346 3-3s-1.346-3-3-3a2.99 2.99 0 0 0-2.815 2H44z"/></g></symbol><symbol id="i-cw" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#e7157b" d="M0 0h64v64H0z"/><path fill="#fff" d="M42.184 39.381a4.095 4.095 0 0 0-8.189 0 4.095 4.095 0 0 0 8.189 0m2 0c0 3.353-2.734 6.081-6.095 6.081s-6.094-2.728-6.094-6.08c0-3.354 2.734-6.082 6.094-6.082s6.095 2.728 6.095 6.081m6.559 10.235-4.897-4.4a10 10 0 0 1-1.061 1.19l4.886 4.397a.806.806 0 0 0 1.131-.059.8.8 0 0 0-.059-1.128m-12.654-2.524c4.262 0 7.729-3.46 7.729-7.71 0-4.252-3.467-7.711-7.729-7.711-4.26 0-7.727 3.459-7.727 7.71s3.467 7.71 7.727 7.71m13.992 1.042a2.796 2.796 0 0 1 .207 3.946c-.553.61-1.317.92-2.083.92a2.8 2.8 0 0 1-1.872-.713l-5.161-4.646a9.67 9.67 0 0 1-5.083 1.446c-5.364 0-9.727-4.354-9.727-9.706s4.363-9.706 9.727-9.706c5.365 0 9.729 4.354 9.729 9.706a9.6 9.6 0 0 1-.921 4.095zM17.697 23.538c0 .401.023.8.07 1.185a.997.997 0 0 1-.806 1.101C15.084 26.308 12 27.772 12 32.157c0 3.323 1.836 5.157 3.377 6.11.672.423 1.263.638 1.761.643h8.989v1.996h-9c-.884-.01-1.827-.329-2.81-.947C12.708 38.964 10 36.62 10 32.157c0-5.27 3.526-7.293 5.71-8.04a14 14 0 0 1-.013-.579c0-4.378 2.976-8.916 6.924-10.56 4.611-1.927 9.498-.971 13.066 2.556 1.047 1.033 1.917 2.274 2.598 3.702a5.3 5.3 0 0 1 3.174-1.061c2.415 0 5.128 1.793 5.663 5.715C50.58 24.722 54 27.278 54 32.217c0 2.89-1.136 5.24-3.287 6.792l-1.172-1.616C51.173 36.214 52 34.473 52 32.217c0-4.978-4.189-6.217-5.99-6.519a.996.996 0 0 1-.824-1.127c-.255-3.04-2.045-4.401-3.727-4.401-1.057 0-2.05.516-2.725 1.416a.999.999 0 0 1-1.741-.26c-.634-1.752-1.547-3.223-2.712-4.375-1.43-1.411-5.348-4.444-10.89-2.132-3.193 1.33-5.694 5.16-5.694 8.72"/></g></symbol><symbol id="i-ct" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#e7157b" d="M0 0h64v64H0z"/><path fill="#fff" d="M20 41.974h3V39.96h-3zm2-4.026h6v-2.013h-6zm24.96-7.884c-.226-2.335-1.404-4.05-3.248-4.672-1.474-.495-3.083-.193-4.361.744-.685-1.443-1.663-3.024-2.649-4.003-3.23-3.208-6.961-3.958-11.086-2.225-3.357 1.404-6.227 5.502-6.58 9.232-1.846.654-4.028 2.101-4.962 4.401l1.852.761c.727-1.79 2.694-3.013 4.321-3.431.443-.114.753-.516.753-.975 0-3.076 2.566-6.95 5.385-8.13 3.404-1.43 6.238-.857 8.913 1.8 1.061 1.053 2.237 3.195 2.762 4.658a1 1 0 0 0 .792.654.98.98 0 0 0 .947-.39c.817-1.094 2.13-1.57 3.279-1.186 1.222.41 1.922 1.723 1.922 3.6 0 .492.354.912.836.992 4.09.685 6.164 2.721 6.164 6.054 0 5.833-5.389 6.035-6 6.039H29V46h17c2.767 0 8-1.683 8-8.052 0-4.106-2.491-6.882-7.04-7.884M22 46h4v-2.013h-4zm3-4.026h11V39.96H25zm-14 0h7V39.96h-7zm2-4.026h6v-2.013h-6zM14 46h6v-2.013h-6zm-4 0h2v-2.013h-2z"/></g></symbol><symbol id="i-ssm" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#e7157b" d="M0 0h64v64H0z"/><path fill="#fff" d="M38 43.999h9v2h-9v1h-2v-1h-3v-2h3v-1h2zm3-5h6v2h-6v1h-2v-1h-6v-2h6v-1h2zm4-5.001h2v2h-2v1h-2v-1H33v-2h10v-1h2zm-28 3h7v2h-7c-.821 0-1.751 0-2.687-.597C12.703 37.383 10 34.997 10 30.477c0-5.358 3.545-7.408 5.73-8.16l-.032-.543c-.002-4.506 2.973-9.114 6.918-10.778 4.613-1.961 9.502-.99 13.076 2.6 1.046 1.047 1.916 2.311 2.597 3.768a5.46 5.46 0 0 1 4.981-.83c2.257.742 3.679 2.789 3.894 5.55C51.701 23.105 54 25.766 54 29.996h-2c0-4.541-3.422-5.66-5.996-6.105a1 1 0 0 1-.813-1.169c-.028-2.205-.952-3.765-2.545-4.288-1.424-.47-2.997.049-3.908 1.288a1.002 1.002 0 0 1-1.748-.258c-.636-1.79-1.549-3.29-2.715-4.457-1.428-1.436-5.348-4.523-10.879-2.17-3.197 1.348-5.7 5.248-5.7 8.877l.077 1.272a1 1 0 0 1-.752 1.03c-1.875.476-5.021 1.95-5.021 6.46 0 3.383 1.841 5.259 3.385 6.236.427.272.869.285 1.615.285m35 4.525-1.101-.063a1.02 1.02 0 0 0-1.032.78 10 10 0 0 1-1.305 3.153 1 1 0 0 0 .179 1.28l.822.733-2.156 2.156-.729-.817a1 1 0 0 0-1.281-.18 10 10 0 0 1-3.157 1.309 1 1 0 0 0-.777 1.033L41.525 52h-3.05l.062-1.095a1 1 0 0 0-.777-1.032 10 10 0 0 1-3.155-1.31.996.996 0 0 0-1.28.18l-.732.82-2.156-2.157.82-.73c.364-.326.44-.868.18-1.281a10 10 0 0 1-1.306-3.155 1.02 1.02 0 0 0-1.032-.78L28 41.523v-3.05l1.103.063c.446.024.924-.3 1.032-.777a10 10 0 0 1 1.307-3.15 1 1 0 0 0-.179-1.28l-.826-.739 2.157-2.156.736.825a1 1 0 0 0 1.279.18 10 10 0 0 1 3.151-1.304 1 1 0 0 0 .777-1.032l-.062-1.106h3.05l-.062 1.107a1 1 0 0 0 .777 1.033c1.117.252 2.177.692 3.148 1.304a1 1 0 0 0 1.28-.18l.738-.827 2.157 2.156-.824.737a1 1 0 0 0-.179 1.28 10 10 0 0 1 1.306 3.151 1.02 1.02 0 0 0 1.032.778L52 38.473zm.943-5.107-1.343.077a12 12 0 0 0-.919-2.218l1.005-.896a1 1 0 0 0 .041-1.454l-3.655-3.654a.97.97 0 0 0-.735-.293 1 1 0 0 0-.718.334l-.899 1.009a12 12 0 0 0-2.214-.918l.076-1.35a1 1 0 0 0-.998-1.056h-5.168a1 1 0 0 0-.998 1.057l.076 1.347c-.767.23-1.509.538-2.216.917l-.897-1.006a1 1 0 0 0-.718-.334.99.99 0 0 0-.735.293l-3.655 3.654a1.002 1.002 0 0 0 .041 1.453l1.007.899q-.572 1.064-.92 2.216l-1.344-.077a1.002 1.002 0 0 0-1.057 1v5.166a1 1 0 0 0 1.057.999l1.339-.077c.232.77.539 1.514.919 2.222l-1.001.892a1.004 1.004 0 0 0-.041 1.454l3.655 3.655a.998.998 0 0 0 1.453-.042l.892-1q1.066.572 2.221.92l-.076 1.338A1 1 0 0 0 37.416 54h5.168a1 1 0 0 0 .998-1.057l-.076-1.335c.77-.232 1.514-.54 2.223-.921l.89.998c.183.205.443.326.718.334.24.012.541-.098.735-.292l3.655-3.655a1 1 0 0 0-.041-1.453l-1.003-.895c.38-.708.687-1.451.919-2.22l1.341.077a1.002 1.002 0 0 0 1.057-1v-5.166a1 1 0 0 0-1.057-1"/></g></symbol><symbol id="i-cfn" viewBox="0 0 64 64"><g fill="none" fill-rule="evenodd"><path fill="#e7157b" d="M0 0h64v64H0z"/><path fill="#fff" d="M42.008 32.788h4.001v-2.022h-4.001zM23.003 42.9h4.001v-2.023h-4zm-8.002 0h5.002v-2.023H15zm0-5.056h9.003V35.82H15zm0-9.1h7.002V26.72h-7.002zm0 4.044h25.007v-2.022H15zm15.004 17.19H12.001v-26.29h18.004v5.055h2v-6.067c0-.558-.448-1.01-1-1.01H11c-.553 0-1 .452-1 1.01V50.99c0 .558.447 1.011 1 1.011h20.005c.552 0 1-.453 1-1.011V35.82h-2zM54 30.766c0 5.598-4.573 7.078-6.99 7.078H35.005V35.82H47.01c.508-.004 4.99-.177 4.99-5.055 0-4.06-2.8-5.85-4.157-6.081a1.007 1.007 0 0 1-.829-1.081l.004-.039c-.039-1.6-.817-2.77-2.151-3.217-1.296-.434-2.757-.052-3.468.91a.98.98 0 0 1-.95.396 1 1 0 0 1-.794-.66c-.47-1.33-1.157-2.198-2.113-3.165-2.3-2.307-4.577-3.58-8.204-2.288-1.646.585-3.624 2.602-4.411 4.494l-1.845-.784c1.01-2.427 3.414-4.842 5.592-5.617 4.892-1.744 7.944.417 10.28 2.762.793.803 1.459 1.587 1.99 2.572 1.275-.839 2.974-1.07 4.554-.54 1.973.663 3.234 2.306 3.479 4.473 2.207.774 5.024 3.284 5.024 7.865"/></g></symbol><symbol id="i-nat" viewBox="0 0 48 48"><path fill="#8c4fff" fill-rule="evenodd" d="M13.626 35.92v-2.837l1.774 1.419zm-.375-5.7a1.001 1.001 0 0 0-1.625.781v7a1.001 1.001 0 0 0 1.625.782l4.374-3.5a1 1 0 0 0 0-1.562zm24-3.383v-3.922l1.962 1.96zm4.083-2.668-4.376-4.375a1 1 0 0 0-1.706.707v3.375h-7.627v-9.5a1 1 0 0 0-1-1h-7.693v2h6.694v8.5H18.75v2h6.875v8.5h-6.693v2h7.694a1 1 0 0 0 1-1v-9.5h7.625v3.376a1 1 0 0 0 1.708.707l4.374-4.376a1 1 0 0 0 0-1.414m-27.708 2.127v-2.84l1.774 1.42zm-.375-5.701a1 1 0 0 0-1.625.78v7.002a1.001 1.001 0 0 0 1.625.78l4.374-3.5a1 1 0 0 0 0-1.562zm.375-4.8v-2.838l1.774 1.419zm-.375-5.7a1.001 1.001 0 0 0-1.625.781v7a1.001 1.001 0 0 0 1.625.78l4.374-3.5a1 1 0 0 0 0-1.561zM24 44.003C12.971 44.003 4 35.03 4 24S12.973 4 24 4c11.03 0 20.002 8.973 20.002 20 0 11.03-8.973 20.003-20.002 20.003M24 2C11.868 2 2 11.869 2 24c0 12.133 9.869 22.003 22 22.003 12.133 0 22.002-9.87 22.002-22.002S36.133 2 24 2"/></symbol><symbol id="i-vpce" viewBox="0 0 48 48"><path fill="#8c4fff" fill-rule="evenodd" d="m20.62 27.602 1.414 1.413 4.363-4.364a1 1 0 0 0 0-1.413l-4.363-4.364-1.414 1.415 2.656 2.656H6.49v2h16.786zm23.27-3.657C43.89 12.948 34.942 4 23.945 4S4 12.948 4 23.945s8.947 19.944 19.945 19.944c10.997 0 19.945-8.946 19.945-19.944m2 0c0 12.1-9.844 21.944-21.945 21.944C11.845 45.89 2 36.045 2 23.946 2 11.844 11.845 2 23.945 2S45.89 11.844 45.89 23.945m-29.927 2.617v.454q0 .09.015.179c.064.349 1.619 8.563 7.967 8.563s7.903-8.215 7.966-8.564a1 1 0 0 0 .016-.177V16.466a1 1 0 0 0-.627-.928l-6.982-2.81a1 1 0 0 0-.746 0l-6.982 2.81a1 1 0 0 0-.627.927v4.861h2v-4.184l5.982-2.408 5.982 2.408v9.776c-.162.771-1.58 6.84-5.982 6.84s-5.82-6.069-5.982-6.84v-.355zm19.454-13.237v13.35c0 4.532-2.398 13.106-11.472 13.106-4.722 0-8.211-2.443-10.091-7.064-1-2.45-1.277-4.868-1.353-6.092l1.996-.125c.056.887.284 3.195 1.21 5.462 1.57 3.862 4.342 5.819 8.238 5.819 9.335 0 9.47-10.653 9.472-11.106V13.998l-9.472-3.812L14.473 14v7.326h-2v-8.001a1 1 0 0 1 .626-.928L23.572 8.18c.238-.096.508-.096.746 0l10.472 4.216a1 1 0 0 1 .627.928"/></symbol><symbol id="i-igw" viewBox="0 0 48 48"><path fill="#8c4fff" fill-rule="evenodd" d="M33.431 35.178h-1.498V17.502a1 1 0 0 0-.589-.911l-.092-.042c-2.009-.907-4.088-1.846-7.076-1.846-3.123 0-5.415 1.009-7.68 2.134a1 1 0 0 0-.556.896v17.445h-1.463V16.312c2.434-1.98 5.943-3.107 9.71-3.107 3.5 0 6.838.997 9.244 2.748zm-9.245-23.973c-4.425 0-8.569 1.419-11.37 3.895a1 1 0 0 0-.339.749v20.329a1 1 0 0 0 1 1h3.463a1 1 0 0 0 1-1V18.356c1.92-.927 3.78-1.653 6.236-1.653 2.335 0 4.033.675 5.757 1.446v18.029a1 1 0 0 0 1 1h3.498a1 1 0 0 0 1-1v-20.72c0-.304-.139-.592-.378-.783-2.774-2.205-6.735-3.47-10.867-3.47m-.232 32.704C12.952 43.909 4 34.957 4 23.954S12.952 4 23.954 4C34.957 4 43.91 12.95 43.91 23.954c0 11.003-8.952 19.955-19.955 19.955m0-41.91C11.848 2 2 11.85 2 23.955c0 12.107 9.85 21.955 21.955 21.955 12.106 0 21.955-9.848 21.955-21.955C45.91 11.849 36.06 2 23.954 2"/></symbol><symbol id="i-users" viewBox="0 0 48 48"><path fill="currentColor" fill-rule="evenodd" d="M28.639 9.286c0-2.915 2.413-5.286 5.38-5.286s5.378 2.371 5.378 5.286-2.412 5.286-5.378 5.286-5.38-2.371-5.38-5.286m11.524 7.048a11.7 11.7 0 0 0-2.035-1.001c1.97-1.31 3.269-3.531 3.269-6.047 0-4.017-3.31-7.286-7.378-7.286-4.069 0-7.38 3.269-7.38 7.286 0 2.51 1.293 4.728 3.256 6.039a11.9 11.9 0 0 0-3.546 2.1l1.303 1.518A9.77 9.77 0 0 1 34 16.572c1.802 0 3.569.505 5.109 1.461 2.74 1.702 4.538 4.692 4.844 7.967H34v2h11a1 1 0 0 0 1-1c0-4.343-2.236-8.43-5.837-10.666M8.639 9.286C8.639 6.371 11.052 4 14.019 4s5.378 2.371 5.378 5.286-2.412 5.286-5.378 5.286-5.38-2.371-5.38-5.286M14 26H4.046C4.53 20.717 8.81 16.572 14 16.572c1.802 0 3.569.505 5.109 1.461.432.269.849.575 1.24.91l1.303-1.517a11.71 11.71 0 0 0-3.524-2.093c1.97-1.31 3.269-3.531 3.269-6.047 0-4.017-3.31-7.286-7.378-7.286-4.069 0-7.38 3.269-7.38 7.286 0 2.515 1.298 4.737 3.268 6.046C5.302 17.071 2 21.638 2 27a1 1 0 0 0 1 1h11zm.046 18c.484-5.283 4.764-9.428 9.954-9.428 1.802 0 3.569.505 5.109 1.461 2.74 1.702 4.538 4.692 4.844 7.967zm4.593-16.714c0-2.915 2.413-5.286 5.38-5.286s5.378 2.371 5.378 5.286-2.412 5.286-5.378 5.286-5.38-2.371-5.38-5.286m11.524 7.048a11.7 11.7 0 0 0-2.035-1.001c1.97-1.31 3.269-3.531 3.269-6.047 0-4.017-3.31-7.286-7.378-7.286-4.069 0-7.38 3.269-7.38 7.286 0 2.515 1.298 4.737 3.268 6.046C15.302 35.071 12 39.638 12 45a1 1 0 0 0 1 1h22a1 1 0 0 0 1-1c0-4.343-2.236-8.43-5.837-10.666"/></symbol><symbol id="i-email" viewBox="0 0 48 48"><path fill="#e7157b" fill-rule="evenodd" d="M28.194 17v-5.891h-.943l-1.896 3.613-1.904-3.613h-.969V17h.799v-4.641l1.666 3.136h.791l1.657-3.128V17zm2.439-2.219h1.981l-.994-2.889zm-.22.655L29.885 17h-.892l2.176-5.891h.935L34.28 17h-.901l-.544-1.564zm-9.035-3.629v-.698h-3.664V17h3.664v-.697h-2.797v-1.989h2.345v-.697h-2.345v-1.81zM35.113 17h.867v-5.891h-.867zm2.329-5.891V17h3.647v-.714h-2.78v-5.177zM4 8c0 2.206 1.794 4 4 4s4-1.794 4-4-1.794-4-4-4-4 1.794-4 4M2 8c0-3.309 2.691-6 6-6 3.308 0 6 2.691 6 6s-2.692 6-6 6c-3.309 0-6-2.691-6-6m42 33.5h2v-2h-2zm1-6.5h-1.5v2h.5v.5h2V36a1 1 0 0 0-1-1m-13.5 2h3v-2h-3zm-6 0h3v-2h-3zm12 0h3v-2h-3zm-24 0h3v-2h-3zm6 0h3v-2h-3zm-12 0h3v-2h-3zM2 36v1.5h2V37h.5v-2H3a1 1 0 0 0-1 1m0 5.5h2v-2H2zm2 2H2V45a1 1 0 0 0 1 1h1.5v-2H4zM37.5 46h3v-2h-3zm-12 0h3v-2h-3zm-12 0h3v-2h-3zm-6 0h3v-2h-3zm24 0h3v-2h-3zm-12 0h3v-2h-3zM44 44h-.5v2H45a1 1 0 0 0 1-1v-1.5h-2zm0-15.5h2v-2h-2zm1-6.5h-1.5v2h.5v.5h2V23a1 1 0 0 0-1-1m-13.5 2h3v-2h-3zm-12 0h3v-2h-3zm-12 0h3v-2h-3zm18 0h3v-2h-3zm-12 0h3v-2h-3zm24 0h3v-2h-3zM2 23v1.5h2V24h.5v-2H3a1 1 0 0 0-1 1m0 5.5h2v-2H2zm2 2H2V32a1 1 0 0 0 1 1h1.5v-2H4zM7.5 33h3v-2h-3zm12 0h3v-2h-3zm-6 0h3v-2h-3zm24 0h3v-2h-3zm-6 0h3v-2h-3zm-6 0h3v-2h-3zM44 31h-.5v2H45a1 1 0 0 0 1-1v-1.5h-2zm2-22v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-4h2v3h40v-8H16V8h29a1 1 0 0 1 1 1"/></symbol><symbol id="i-cloud" viewBox="0 0 40 40"><g fill="none" fill-rule="evenodd"><path fill="#242f3e" d="M0 0h40v40H0z"/><path fill="#fff" d="M32.698 23.9c.361.47-.4 2.4-.74 3.264-.105.262.117.365.35.168 1.512-1.284 1.904-3.975 1.593-4.363-.307-.386-2.95-.717-4.563.432-.249.177-.206.42.07.389.907-.112 2.93-.357 3.29.11m-.842 2.01c.518-.378.074-.941-.454-.72-3.513 1.464-7.327 2.173-10.8 2.173-5.143 0-10.127-1.39-14.156-3.695-.352-.202-.613.155-.319.414 3.733 3.316 8.67 5.309 14.147 5.309 3.91 0 8.451-1.208 11.582-3.481m-2.144-5.215a6.6 6.6 0 0 1-1.459-.161q-.714-.163-1.093-.373-.233-.128-.29-.258a.7.7 0 0 1-.059-.26v-.47q0-.29.216-.292.083.002.173.033.091.034.241.098.48.21 1.044.324.564.113 1.126.113.895 0 1.384-.308a.97.97 0 0 0 .49-.873.88.88 0 0 0-.258-.65q-.256-.258-.952-.484l-1.375-.421q-1.045-.325-1.517-.938a2.17 2.17 0 0 1-.472-1.347q0-.581.258-1.027.255-.445.676-.761.427-.314.99-.478A4.3 4.3 0 0 1 30.025 12q.315 0 .64.04a6.3 6.3 0 0 1 1.15.252q.248.082.4.162a.9.9 0 0 1 .28.227.5.5 0 0 1 .083.308v.436q0 .291-.217.29-.114.002-.364-.111c-.54-.24-1.15-.356-1.82-.356q-.815 0-1.262.258-.448.26-.448.827 0 .388.283.655.281.267 1.044.51l1.342.423q1.028.322 1.466.888.441.568.441 1.295 0 .6-.25 1.078-.248.477-.689.817a3.1 3.1 0 0 1-1.05.518q-.615.179-1.343.178m-12.165-.244q-.248.002-.365-.087-.117-.09-.199-.365l-2.222-7.157a1.8 1.8 0 0 1-.082-.371q0-.227.233-.227h.927q.265 0 .374.09.106.086.19.364l1.59 6.12 1.477-6.12q.066-.278.181-.364.116-.09.38-.09h.765q.263 0 .38.09.116.086.182.364l1.493 6.2 1.64-6.2q.082-.278.19-.364.109-.09.373-.09h.878q.233 0 .233.227a1 1 0 0 1-.016.144 2 2 0 0 1-.068.227l-2.286 7.157q-.083.275-.2.365-.116.088-.364.087h-.813q-.264.001-.38-.094-.116-.099-.182-.373l-1.476-5.96-1.457 5.96q-.067.274-.183.373-.116.095-.38.094zM9.94 19.449q.465 0 .98-.17.513-.17.893-.592.232-.259.324-.591.09-.33.09-.801v-.388a8 8 0 0 0-1.757-.211q-.945 0-1.408.373-.464.37-.465 1.07 0 .645.35.978.347.332.993.332m3.846-1.408q0 .517.107.825.11.31.307.664a.4.4 0 0 1 .066.209q0 .148-.182.276l-.597.39a.5.5 0 0 1-.248.08.4.4 0 0 1-.282-.128 2 2 0 0 1-.339-.43 6 6 0 0 1-.29-.544q-1.112 1.28-2.785 1.28-1.194.001-1.89-.664-.696-.664-.696-1.78 0-1.182.863-1.903.86-.72 2.32-.721.48 0 1.002.073t1.084.203v-.68q.001-1.052-.446-1.482-.446-.428-1.54-.428a4.5 4.5 0 0 0-1.02.12 7.5 7.5 0 0 0-1.02.315 3 3 0 0 1-.33.122.7.7 0 0 1-.15.024q-.199.001-.2-.292v-.452q.001-.228.068-.323.066-.099.265-.195a6 6 0 0 1 1.192-.421 6 6 0 0 1 1.476-.18c1.126 0 1.952.254 2.477.754q.787.753.788 2.275z"/></g></symbol><symbol id="i-region" viewBox="0 0 40 40"><g fill="none" fill-rule="evenodd"><path fill="#00a4a6" d="M0 0h40v40H0z"/><path fill="#fff" d="M14 20.026v-9h15.293l-4.147 4.146a.5.5 0 0 0 0 .708l4.147 4.146zm12.207-4.5 4.647-4.646a.5.5 0 0 0-.354-.854H14V8.97A1.528 1.528 0 0 0 13.495 6c-.845 0-1.532.687-1.532 1.531 0 .67.435 1.235 1.037 1.442v24.053h-3v1h7v-1h-3v-12h16.5a.5.5 0 0 0 .354-.854z"/></g></symbol><symbol id="i-vpc" viewBox="0 0 40 40"><g fill="none" fill-rule="evenodd"><path fill="#8c4fff" d="M0 0h40v40H0z"/><path fill="#fff" d="m30.97 21.03-2.943-1.264v10.49c2.545-.353 2.932-2.969 2.948-3.088zm-3.943 9.24V19.76l-3.035 1.272v6.201c.013.054.445 2.767 3.035 3.036m.306-11.723a.5.5 0 0 1 .39.001l3.945 1.692a.5.5 0 0 1 .303.46v6.533c-.183 1.447-1.357 4.063-4.527 4.063-3.075 0-4.254-2.612-4.448-3.994l-.004-6.603c0-.2.12-.383.306-.46zm5.65.637-5.461-2.406-5.53 2.327v7.128c-.001.042-.054 2.868 1.657 4.623.917.941 2.194 1.42 3.795 1.42 1.602 0 2.887-.48 3.819-1.423 1.735-1.758 1.72-4.585 1.72-4.613zM31.98 31.55c-1.127 1.144-2.654 1.725-4.536 1.725-1.884 0-3.404-.58-4.517-1.727-2.005-2.063-1.94-5.197-1.935-5.329v-7.446a.5.5 0 0 1 .305-.46l6.035-2.54a.5.5 0 0 1 .396.003l5.956 2.625c.182.08.299.26.299.457v7.375c.002.125.027 3.255-2.003 5.317m-20.988-7.314h8v1h-8c-2.811 0-4.811-2.016-4.98-5.016A4 4 0 0 1 6 19.841c0-2.509 1.318-4.223 3.817-4.979a8 8 0 0 1-.032-.647c0-2.916 1.577-5.445 4.017-6.445 3.298-1.348 7.042-.894 9.106 1.104a8.2 8.2 0 0 1 1.76 2.485c.609-.45 1.4-.66 2.349-.614 1.78.09 3.149 1.713 3.433 4.007 1.498.124 2.485.883 3.01 2.308l-.937.346c-.428-1.157-1.208-1.673-2.531-1.673a.5.5 0 0 1-.5-.47c-.138-2.338-1.406-3.463-2.526-3.519-.945-.053-1.645.22-2.08.791a.5.5 0 0 1-.472.193.5.5 0 0 1-.395-.323 7.4 7.4 0 0 0-1.807-2.814c-1.788-1.73-5.09-2.099-8.031-.895-2.063.845-3.396 3.011-3.396 5.52 0 .272.035.695.066.958a.5.5 0 0 1-.376.544C8.169 16.29 7 17.678 7 19.841c0 .101-.001.201.009.302.14 2.495 1.703 4.093 3.983 4.093"/></g></symbol></defs></svg>
+<main>
+  <header class="top">
+    <div>
+      <h1>DocuProcess Cloud: architecture</h1>
+      <p class="lede">How the platform is deployed on the AWS Academy sandbox (<code>us-east-1</code>): where each component runs, how a document travels from the browser to a result, and which sandbox limits shaped the design. Everything below is derived from <code>infra/terraform/</code> and <code>specs/</code>.</p>
+    </div>
+    <button class="theme-toggle" type="button" id="themeToggle" aria-label="Toggle color theme">Theme: auto</button>
+  </header>
+
+  <div class="facts">
+    <div class="fact"><b>1 entry point</b><span>CloudFront serves the site and proxies <code>/api/*</code></span></div>
+    <div class="fact"><b>2 Availability Zones</b><span>public, app and DB subnets in each</span></div>
+    <div class="fact"><b>EC2 Auto Scaling 2 – 4</b><span>API and worker on every instance</span></div>
+    <div class="fact"><b>RDS + DynamoDB + S3</b><span>users · jobs and results · files</span></div>
+    <div class="fact"><b>0 Lambda, 0 IAM created</b><span>sandbox rules (ADR-023, CON-IAM-01)</span></div>
+  </div>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#topology">Topology</a>
+    <a href="#flow">Upload &amp; processing</a>
+    <a href="#jobs">Job lifecycle</a>
+    <a href="#instance">Inside an instance</a>
+    <a href="#network">Network &amp; security</a>
+    <a href="#data">Data placement</a>
+    <a href="#constraints">Sandbox constraints</a>
+    <a href="#status">Verification status</a>
+  </nav>
+
+  <!-- ============================================================ -->
+  <h2 id="topology">1. Deployment topology</h2>
+  <p class="section-intro">One VPC across two Availability Zones. Browsers only ever talk to CloudFront. The ALB lives in the public subnets; EC2 instances and RDS have no public IP. S3 and DynamoDB are reached through free gateway endpoints; SNS and SSM go out through the single NAT gateway.</p>
+
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 1340 830" role="img" aria-labelledby="topo-title topo-desc">
+      <title id="topo-title">DocuProcess Cloud deployment topology</title>
+      <desc id="topo-desc">Users reach CloudFront over HTTPS. CloudFront serves static files from a private S3 bucket and forwards /api/* to an Application Load Balancer in two public subnets. The ALB forwards to an Auto Scaling group of EC2 instances in two private app subnets, which use RDS MySQL in a private DB subnet, S3 and DynamoDB through gateway endpoints, and SNS and SSM through a NAT gateway. CloudWatch alarms publish to SNS, which emails subscribers.</desc>
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0 10 5 0 10z"/></marker>
+        <marker id="ah-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk purple" d="M0 0 10 5 0 10z"/></marker>
+        <marker id="ah-k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk pink" d="M0 0 10 5 0 10z"/></marker>
+      </defs>
+
+      <!-- AWS Cloud and Region -->
+      <rect class="g-cloud" x="130" y="10" width="1080" height="810"/>
+      <use href="#i-cloud" x="130" y="10" width="28" height="28"/>
+      <text class="gl" x="166" y="29">AWS Cloud</text>
+      <rect class="g-region" x="260" y="30" width="930" height="780"/>
+      <use href="#i-region" x="260" y="30" width="24" height="24"/>
+      <text class="gl teal" x="292" y="47">Region · us-east-1</text>
+
+      <!-- VPC -->
+      <rect class="g-vpc" x="290" y="72" width="680" height="508"/>
+      <use href="#i-vpc" x="290" y="72" width="26" height="26"/>
+      <text class="gl purple" x="324" y="90">VPC 10.0.0.0/16</text>
+
+      <!-- AZ A -->
+      <rect class="g-az" x="302" y="104" width="656" height="218" rx="6"/>
+      <text class="azl" x="950" y="118" text-anchor="end">Availability Zone A</text>
+      <rect class="g-pub" x="314" y="124" width="172" height="190" rx="4"/>
+      <text class="sl" x="322" y="138">PUBLIC SUBNET</text><text class="sc" x="322" y="150">10.0.101.0/24</text>
+      <rect class="g-priv" x="506" y="124" width="236" height="190" rx="4"/>
+      <text class="sl" x="514" y="138">PRIVATE · APP</text><text class="sc" x="514" y="150">10.0.1.0/24</text>
+      <rect class="g-priv" x="762" y="124" width="184" height="190" rx="4"/>
+      <text class="sl" x="770" y="138">PRIVATE · DB</text><text class="sc" x="770" y="150">10.0.11.0/24</text>
+
+      <!-- AZ B -->
+      <rect class="g-az" x="302" y="336" width="656" height="218" rx="6"/>
+      <text class="azl" x="950" y="350" text-anchor="end">Availability Zone B</text>
+      <rect class="g-pub" x="314" y="356" width="172" height="190" rx="4"/>
+      <text class="sl" x="322" y="370">PUBLIC SUBNET</text><text class="sc" x="322" y="382">10.0.102.0/24</text>
+      <rect class="g-priv" x="506" y="356" width="236" height="190" rx="4"/>
+      <text class="sl" x="514" y="539">PRIVATE · APP</text><text class="sc" x="596" y="539">10.0.2.0/24</text>
+      <rect class="g-priv" x="762" y="356" width="184" height="190" rx="4"/>
+      <text class="sl" x="770" y="370">PRIVATE · DB</text><text class="sc" x="770" y="382">10.0.12.0/24</text>
+      <text class="muted-t" x="854" y="448">no standby instance</text>
+      <text class="muted-t" x="854" y="462">(subnet group only, ADR-003)</text>
+
+      <!-- Auto Scaling group -->
+      <rect class="g-asg" x="548" y="166" width="152" height="360" rx="6"/>
+      <use href="#i-asg" x="537" y="155" width="22" height="22"/>
+
+      <!-- ===== edges (drawn before icons) ===== -->
+      <!-- users -> cloudfront -->
+      <path class="edge" d="M86 330 H164" marker-end="url(#ah)"/>
+      <text class="al mid" x="125" y="320">HTTPS :443</text>
+      <!-- cloudfront -> alb -->
+      <path class="edge" d="M225 330 H413" marker-end="url(#ah)"/>
+      <text class="al mid" x="345" y="326">/api/* → HTTP :80</text>
+      <!-- cloudfront -> s3 frontend -->
+      <path class="edge" d="M195 396 V700 H313" marker-end="url(#ah)"/>
+      <text class="al" x="202" y="560">default (*) · OAC</text>
+      <!-- alb -> ec2 a / b -->
+      <path class="edge" d="M469 329 H498 V210 H593" marker-end="url(#ah)"/>
+      <path class="edge" d="M498 329 V432 H593" marker-end="url(#ah)"/>
+      <text class="al" x="503" y="333">HTTP :8000</text>
+      <!-- ec2 -> rds -->
+      <path class="edge" d="M655 210 H823" marker-end="url(#ah)"/>
+      <path class="edge" d="M655 432 H752 V210"/>
+      <text class="al mid" x="739" y="202">MySQL :3306 · TLS</text>
+      <!-- ec2 -> nat -> igw -> public endpoints -->
+      <path class="edge out" d="M594 190 H466" marker-end="url(#ah-p)"/>
+      <text class="al purple mid" x="526" y="204">egress</text>
+      <path class="edge out" d="M440 182 V94" marker-end="url(#ah-p)"/>
+      <path class="edge out" d="M440 54 V46 H1010 V290 H1048" marker-end="url(#ah-p)"/>
+      <path class="edge out" d="M1010 150 H1048" marker-end="url(#ah-p)"/>
+      <text class="al purple mid" x="725" y="63">outbound HTTPS :443 via NAT → IGW to public service endpoints (ADR-006)</text>
+      <!-- asg -> gateway endpoints -->
+      <path class="edge" d="M590 527 V559" marker-end="url(#ah)"/>
+      <path class="edge" d="M660 527 V559" marker-end="url(#ah)"/>
+      <!-- s3 endpoint -> uploads / artifacts -->
+      <path class="edge" d="M590 599 V618 H560 V673" marker-end="url(#ah)"/>
+      <path class="edge dash" d="M560 618 H450 V673" marker-end="url(#ah)"/>
+      <!-- dynamodb endpoint -> dynamodb -->
+      <path class="edge" d="M660 599 V618 H820 V669" marker-end="url(#ah)"/>
+      <!-- metrics -> cloudwatch -> sns -->
+      <path class="edge dash" d="M971 430 H1049" marker-end="url(#ah)"/>
+      <text class="al mid" x="1010" y="423">metrics</text>
+      <path class="edge alarm" d="M1109 430 H1150 V170 H1111" marker-end="url(#ah-k)"/>
+      <text class="al pink mid" transform="translate(1163 300) rotate(90)">alarm actions</text>
+      <!-- sns -> email -->
+      <path class="edge" d="M1109 150 H1247" marker-end="url(#ah)"/>
+      <text class="al mid" x="1180" y="142">email</text>
+      <!-- cloudtrail -> audit logs -->
+      <path class="edge off" d="M1080 726 V796 H670 V763" marker-end="url(#ah)"/>
+      <text class="al muted mid" x="870" y="790">logs, only if the trail is enabled</text>
+
+      <!-- ===== nodes ===== -->
+      <!-- users -->
+      <use class="users-ic" href="#i-users" x="36" y="306" width="48" height="48"/>
+      <text class="nl" x="60" y="372">Users</text>
+      <text class="ns" x="60" y="385">browser</text>
+
+      <!-- cloudfront -->
+      <use href="#i-cloudfront" x="167" y="302" width="56" height="56"/>
+      <text class="nl" x="195" y="374">CloudFront</text>
+      <text class="ns" x="195" y="387">*.cloudfront.net</text>
+
+      <!-- igw -->
+      <use href="#i-igw" x="422" y="54" width="36" height="36"/>
+      <text class="ns start" x="464" y="86">Internet gateway</text>
+
+      <!-- nat -->
+      <use href="#i-nat" x="418" y="183" width="44" height="44"/>
+      <text class="nl" x="440" y="244">NAT gateway</text>
+      <text class="ns" x="440" y="257">single (ADR-005)</text>
+
+      <!-- alb -->
+      <use href="#i-elb" x="416" y="305" width="48" height="48"/>
+      <text class="nl" x="440" y="402">ALB</text>
+      <text class="ns" x="440" y="415">HTTP :80 · 2 AZs</text>
+
+      <!-- ec2 a / b -->
+      <use href="#i-ec2" x="596" y="182" width="56" height="56"/>
+      <text class="nl" x="624" y="253">EC2 · API + worker</text>
+      <text class="ns" x="624" y="266">t3.micro · port 8000</text>
+      <use href="#i-ec2" x="596" y="404" width="56" height="56"/>
+      <text class="nl" x="624" y="475">EC2 · API + worker</text>
+      <text class="ns" x="624" y="488">t3.micro · port 8000</text>
+      <text class="nl" x="624" y="507" style="fill:var(--orange)">Auto Scaling group</text>
+      <text class="ns" x="624" y="519">min 2 · max 4 · CPU 60 %</text>
+
+      <!-- rds -->
+      <use href="#i-rds" x="826" y="182" width="56" height="56"/>
+      <text class="nl" x="854" y="253">RDS MySQL 8.0</text>
+      <text class="ns" x="854" y="266">db.t3.micro · Single-AZ</text>
+
+      <!-- gateway endpoints -->
+      <use href="#i-vpce" x="572" y="562" width="36" height="36"/>
+      <text class="ns" x="566" y="606" style="text-anchor:end">S3 gateway endpoint</text>
+      <use href="#i-vpce" x="642" y="562" width="36" height="36"/>
+      <text class="ns start" x="684" y="606">DynamoDB gateway endpoint</text>
+
+      <!-- cloudformation bucket stack -->
+      <rect class="g-cfn" x="286" y="630" width="434" height="150" rx="6"/>
+      <use href="#i-cfn" x="275" y="769" width="22" height="22"/>
+      <text class="gl pink" x="304" y="773">CloudFormation stack: S3 buckets (ADR-035)</text>
+      <use href="#i-s3" x="316" y="676" width="48" height="48"/>
+      <text class="nl" x="340" y="740">S3 frontend</text>
+      <text class="ns" x="340" y="753">static site</text>
+      <use href="#i-s3" x="426" y="676" width="48" height="48"/>
+      <text class="nl" x="450" y="740">S3 artifacts</text>
+      <text class="ns" x="450" y="753">release tarballs</text>
+      <use href="#i-s3" x="536" y="676" width="48" height="48"/>
+      <text class="nl" x="560" y="740">S3 uploads</text>
+      <text class="ns" x="560" y="753">original files</text>
+      <use href="#i-s3" x="646" y="676" width="48" height="48"/>
+      <text class="nl" x="670" y="740">S3 audit-logs</text>
+      <text class="ns" x="670" y="753">trail target</text>
+
+      <!-- dynamodb -->
+      <use href="#i-ddb" x="792" y="672" width="56" height="56"/>
+      <text class="nl" x="820" y="744">DynamoDB</text>
+      <text class="ns" x="820" y="757">documents · jobs</text>
+      <text class="ns" x="820" y="770">on-demand</text>
+
+      <!-- right column -->
+      <use href="#i-sns" x="1052" y="122" width="56" height="56"/>
+      <text class="nl" x="1080" y="194">SNS</text>
+      <text class="ns" x="1080" y="207">processing-events</text>
+      <text class="ns" x="1080" y="220">ops-alarms</text>
+
+      <use href="#i-ssm" x="1052" y="262" width="56" height="56"/>
+      <text class="nl" x="1080" y="334">SSM Parameter Store</text>
+      <text class="ns" x="1080" y="347">DB password</text>
+
+      <use href="#i-cw" x="1052" y="402" width="56" height="56"/>
+      <text class="nl" x="1080" y="474">CloudWatch</text>
+      <text class="ns" x="1080" y="487">7 alarms · dashboard</text>
+
+      <g class="disabled">
+        <use href="#i-ct" x="1056" y="676" width="48" height="48"/>
+      </g>
+      <text class="nl start" x="1112" y="694">CloudTrail</text>
+      <text class="ns start" x="1112" y="707">off by default</text>
+      <text class="ns start" x="1112" y="720">(INF-AUD-03)</text>
+
+      <!-- email -->
+      <use href="#i-email" x="1250" y="128" width="44" height="44"/>
+      <text class="nl" x="1272" y="190">Email</text>
+      <text class="ns" x="1272" y="203">subscribers</text>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><svg viewBox="0 0 38 10"><path d="M2 5H36" stroke="var(--line)" stroke-width="1.6"/></svg>request / data path</span>
+      <span><svg viewBox="0 0 38 10"><path d="M2 5H36" stroke="var(--line)" stroke-width="1.6" stroke-dasharray="5 4"/></svg>boot-time, metrics or optional</span>
+      <span><svg viewBox="0 0 38 10"><path d="M2 5H36" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="2 4" stroke-linecap="round"/></svg>outbound through NAT</span>
+      <span><svg viewBox="0 0 38 10"><path d="M2 5H36" stroke="var(--pink)" stroke-width="1.6"/></svg>alarm notification</span>
+    </div>
+    <figcaption>Every instance in the Auto Scaling group runs both the API and the worker. Instances in AZ B also leave through the NAT gateway in AZ A, because there is only one (ADR-005). CloudTrail is drawn faded: the lab role cannot call <code>cloudtrail:CreateTrail</code>, so <code>enable_cloudtrail</code> defaults to <code>false</code> (answered Q-003).</figcaption>
+  </figure>
+
+  <!-- ============================================================ -->
+  <h2 id="flow">2. Upload and processing flow</h2>
+  <p class="section-intro">The API never processes documents. It stores the file, records a <code>PENDING</code> job and returns <code>202 Accepted</code> at once. Any worker in the group can claim the job; the browser polls until the status is terminal.</p>
+
+  <figure>
+    <div class="scroll">
+    <svg class="wide" viewBox="0 0 1180 880" role="img" aria-labelledby="seq-title">
+      <title id="seq-title">Sequence of an upload, its asynchronous processing, and status polling</title>
+      <defs>
+        <marker id="sh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0 10 5 0 10z"/></marker>
+      </defs>
+
+      <!-- phase bands -->
+      <rect class="band" x="0" y="112" width="1180" height="230" rx="6"/>
+      <text class="band-l" x="10" y="128">UPLOAD</text>
+      <rect class="band" x="0" y="352" width="1180" height="368" rx="6"/>
+      <text class="band-l" x="10" y="368">PROCESSING (ASYNC)</text>
+      <rect class="band" x="0" y="730" width="1180" height="140" rx="6"/>
+      <text class="band-l" x="10" y="746">POLLING</text>
+
+      <!-- lifelines -->
+      <path class="lifeline" d="M70 100 V870 M215 100 V870 M365 100 V870 M515 100 V870 M665 100 V870 M815 100 V870 M960 100 V870 M1100 100 V870"/>
+
+      <!-- lane heads -->
+      <use class="users-ic" href="#i-users" x="48" y="14" width="44" height="44"/>
+      <text class="lane-head" x="70" y="76">Browser</text><text class="lane-sub" x="70" y="89">frontend JS</text>
+      <use href="#i-cloudfront" x="171" y="14" width="44" height="44"/>
+      <use href="#i-elb" x="217" y="14" width="44" height="44"/>
+      <text class="lane-head" x="215" y="76">CloudFront + ALB</text><text class="lane-sub" x="215" y="89">same origin</text>
+      <use href="#i-ec2" x="343" y="14" width="44" height="44"/>
+      <text class="lane-head" x="365" y="76">API</text><text class="lane-sub" x="365" y="89">FastAPI on EC2</text>
+      <use href="#i-s3" x="493" y="14" width="44" height="44"/>
+      <text class="lane-head" x="515" y="76">S3 uploads</text><text class="lane-sub" x="515" y="89">original file</text>
+      <use href="#i-ddb" x="643" y="14" width="44" height="44"/>
+      <text class="lane-head" x="665" y="76">DynamoDB</text><text class="lane-sub" x="665" y="89">documents · jobs</text>
+      <use href="#i-ec2" x="793" y="14" width="44" height="44"/>
+      <text class="lane-head" x="815" y="76">Worker</text><text class="lane-sub" x="815" y="89">systemd on EC2</text>
+      <rect class="engine-box" x="938" y="14" width="44" height="44" rx="8"/>
+      <text class="engine-t" x="960" y="41">{ }</text>
+      <text class="lane-head" x="960" y="76">Receipt engine</text><text class="lane-sub" x="960" y="89">Python + Tesseract</text>
+      <use href="#i-sns" x="1078" y="14" width="44" height="44"/>
+      <text class="lane-head" x="1100" y="76">SNS</text><text class="lane-sub" x="1100" y="89">processing-events</text>
+
+      <!-- UPLOAD -->
+      <path class="msg" d="M70 152 H213" marker-end="url(#sh)"/>
+      <text class="ml" x="142" y="146"><tspan class="num">1</tspan> POST /api/v1/documents</text>
+      <path class="msg" d="M215 184 H363" marker-end="url(#sh)"/>
+      <text class="ml" x="290" y="178"><tspan class="num">2</tspan> /api/* → ALB → :8000</text>
+      <path class="msg" d="M365 206 H405 V224 H367" marker-end="url(#sh)"/>
+      <text class="ml start" x="412" y="219"><tspan class="num">3</tspan> check session · sniff type · size ≤ 5 MiB</text>
+      <path class="msg" d="M365 256 H513" marker-end="url(#sh)"/>
+      <text class="ml" x="440" y="250"><tspan class="num">4</tspan> PutObject</text>
+      <path class="msg" d="M365 290 H663" marker-end="url(#sh)"/>
+      <text class="ml" x="515" y="284"><tspan class="num">5</tspan> PutItem documents + jobs (PENDING)</text>
+      <path class="msg ret" d="M365 324 H72" marker-end="url(#sh)"/>
+      <text class="ml" x="218" y="318"><tspan class="num">6</tspan> 202 Accepted {document_id, job_id}</text>
+
+      <!-- PROCESSING -->
+      <path class="msg" d="M815 396 H667" marker-end="url(#sh)"/>
+      <text class="ml" x="740" y="390"><tspan class="num">7</tspan> query due jobs (every 5 s)</text>
+      <path class="msg" d="M815 430 H667" marker-end="url(#sh)"/>
+      <text class="ml" x="740" y="424"><tspan class="num">8</tspan> claim → RUNNING, lease 300 s</text>
+      <path class="msg" d="M815 464 H517" marker-end="url(#sh)"/>
+      <text class="ml" x="590" y="458"><tspan class="num">9</tspan> GetObject</text>
+      <path class="msg" d="M815 498 H958" marker-end="url(#sh)"/>
+      <text class="ml" x="887" y="492"><tspan class="num">10</tspan> process(bytes)</text>
+      <path class="msg" d="M960 520 H1000 V540 H962" marker-end="url(#sh)"/>
+      <text class="ml end" x="952" y="535"><tspan class="num">11</tspan> OCR → extract → normalize → validate</text>
+      <path class="msg ret" d="M960 574 H817" marker-end="url(#sh)"/>
+      <text class="ml" x="887" y="568"><tspan class="num">12</tspan> ExtractionResult</text>
+      <path class="msg" d="M815 608 H667" marker-end="url(#sh)"/>
+      <text class="ml" x="740" y="602"><tspan class="num">13</tspan> result + terminal status (1 transaction)</text>
+      <path class="msg" d="M815 642 H1098" marker-end="url(#sh)"/>
+      <text class="ml" x="957" y="636"><tspan class="num">14</tspan> Publish {document_id, job_id, status}</text>
+      <path class="msg" d="M1100 680 H1170" marker-end="url(#sh)"/>
+      <text class="ml" x="1135" y="674"><tspan class="num">15</tspan> email</text>
+      <text class="ml start" x="822" y="708" style="fill:var(--muted)">retryable failure → back to PENDING with back-off (see 3)</text>
+
+      <!-- POLLING -->
+      <path class="msg" d="M70 776 H363" marker-end="url(#sh)"/>
+      <text class="ml" x="218" y="770"><tspan class="num">16</tspan> GET /api/v1/documents/{id}</text>
+      <path class="msg" d="M365 808 H663" marker-end="url(#sh)"/>
+      <text class="ml" x="515" y="802"><tspan class="num">17</tspan> GetItem (consistent read)</text>
+      <path class="msg ret" d="M365 842 H72" marker-end="url(#sh)"/>
+      <text class="ml" x="218" y="836"><tspan class="num">18</tspan> status + extracted fields</text>
+    </svg>
+    </div>
+    <figcaption>Steps 1–6 take one HTTP request. Steps 7–15 run on whichever instance claims the job first: the claim is a conditional DynamoDB transaction, so two workers can never own the same job (WRK-CLM-02, ADR-036). The engine never touches AWS; it receives bytes and returns a result (ADR-011). Raw OCR text is never stored (ADR-018).</figcaption>
+  </figure>
+
+  <!-- ============================================================ -->
+  <h2 id="jobs">3. Job lifecycle</h2>
+  <p class="section-intro">The <code>jobs</code> table is the queue (ADR-010): there is no SQS. Every transition is a conditional write that checks the expected status and, while <code>RUNNING</code>, the lease owner.</p>
+
+  <figure>
+    <div class="scroll">
+    <svg class="mid" viewBox="0 0 940 330" role="img" aria-labelledby="sm-title">
+      <title id="sm-title">Job state machine: PENDING, RUNNING, and the terminal states COMPLETED, PARTIAL and FAILED</title>
+      <defs>
+        <marker id="smh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0 10 5 0 10z"/></marker>
+      </defs>
+      <text class="al mid muted" x="115" y="124">created by the API</text>
+      <path class="edge" d="M190 158 H358" marker-end="url(#smh)"/>
+      <text class="al mid" x="274" y="149">claim · attempts + 1</text>
+      <path class="edge" d="M510 152 C 620 152, 630 66, 738 66" marker-end="url(#smh)"/>
+      <text class="al mid" x="612" y="92">engine: completed</text>
+      <path class="edge" d="M510 165 H738" marker-end="url(#smh)"/>
+      <text class="al mid" x="624" y="158">engine: partial</text>
+      <path class="edge" d="M510 178 C 620 178, 630 264, 738 264" marker-end="url(#smh)"/>
+      <text class="al mid" x="612" y="246">permanent error, or 3 attempts used</text>
+      <path class="edge dash" d="M435 191 C 435 292, 115 292, 115 193" marker-end="url(#smh)"/>
+      <text class="al mid" x="275" y="306">retryable error → back-off 30 s, 60 s, 120 s</text>
+      <path class="edge dash" d="M410 139 C 410 92, 460 92, 460 137" marker-end="url(#smh)"/>
+      <text class="al mid" x="435" y="84">lease (300 s) expired → reclaimable</text>
+
+      <g class="st st-pending"><rect x="40" y="139" width="150" height="52" rx="10"/><text x="115" y="170">PENDING</text></g>
+      <g class="st st-running"><rect x="360" y="139" width="150" height="52" rx="10"/><text x="435" y="170">RUNNING</text></g>
+      <g class="st st-completed"><rect x="740" y="40" width="150" height="52" rx="10"/><text x="815" y="71">COMPLETED</text></g>
+      <g class="st st-partial"><rect x="740" y="139" width="150" height="52" rx="10"/><text x="815" y="170">PARTIAL</text></g>
+      <g class="st st-failed"><rect x="740" y="238" width="150" height="52" rx="10"/><text x="815" y="269">FAILED</text></g>
+      <text class="al mid muted" x="815" y="316">terminal: worker publishes to SNS</text>
+    </svg>
+    </div>
+    <figcaption>Each job gets at most 3 attempts (WRK-CLM-06), and the engine has a 120 s deadline per job, well inside the 300 s lease (WRK-CLM-04). The document item in <code>documents</code> mirrors the job status in the same transaction (WRK-PER-01). If the SNS publish fails three times, the job stays terminal with <code>notification_status = FAILED</code> (WRK-NOT-03).</figcaption>
+  </figure>
+
+  <!-- ============================================================ -->
+  <h2 id="instance">4. Inside an instance</h2>
+  <p class="section-intro">The launch template boots Ubuntu 24.04 LTS (ADR-038) with the pre-existing SSM instance profile. User data installs the application from a versioned release in S3, so a replaced instance comes back identical.</p>
+
+  <div class="instance">
+    <div class="instance-title"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#i-ec2"/></svg>EC2 instance <small>· private app subnet · no public IP · no SSH (SSM Session Manager only)</small></div>
+    <div class="svc">
+      <h4>docuprocess-api.service</h4>
+      <p>Uvicorn, 2 processes, port <b>8000</b>. Target of the ALB; health check <code>GET /api/v1/health</code>.</p>
+      <p>Auth and sessions in RDS · uploads to S3 · documents and jobs in DynamoDB.</p>
+    </div>
+    <div class="svc">
+      <h4>docuprocess-worker.service</h4>
+      <p>Polls DynamoDB, claims jobs with a lease, persists results, publishes to SNS.</p>
+      <div class="lib"><b>receipt_engine</b> (imported library, no AWS imports) → <b>Tesseract</b> OCR, Spanish and English language packs (ADR-012)</div>
+    </div>
+    <div class="svc">
+      <h4>/etc/docuprocess/app.env</h4>
+      <p>Bucket, table and topic names come from Terraform outputs; the DB password is read from SSM at boot and never rendered into user data (SEC-SEC-02).</p>
+    </div>
+  </div>
+
+  <h3>Bootstrap sequence (user data)</h3>
+  <ol class="boot">
+    <li><b>System packages</b><span>apt: tesseract-ocr + spa/eng language packs</span></li>
+    <li><b>AWS CLI v2</b><span>official installer; Ubuntu images do not ship it</span></li>
+    <li><b>Python 3.12</b><span>installed with uv, independent of the OS Python</span></li>
+    <li><b>RDS CA bundle</b><span>so MySQL connections verify TLS</span></li>
+    <li><b>DB password</b><span><code>ssm:GetParameter</code> (SecureString) → <code>app.env</code></span></li>
+    <li><b>Release download</b><span><code>s3://…-artifacts/releases/&lt;v&gt;/</code> via the S3 endpoint</span></li>
+    <li><b>Virtualenv</b><span>locked requirements + engine, worker, api packages</span></li>
+    <li><b>Migrations</b><span>MySQL <code>GET_LOCK</code>, safe with concurrent instances</span></li>
+    <li><b>systemd</b><span>enable and start the API and worker services</span></li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2 id="network">5. Network and security</h2>
+  <p class="section-intro">Traffic can only move one hop inward. Each security group admits only the group in front of it; nothing allows SSH.</p>
+
+  <div class="sg-chain">
+    <div class="sg"><div class="name">Internet</div><div class="who">CloudFront origin requests</div><div class="rule">Browsers reach the ALB only through CloudFront (ADR-030).</div></div>
+    <div class="sg-arrow">TCP 80</div>
+    <div class="sg"><div class="name">alb-sg</div><div class="who">Application Load Balancer</div><div class="rule">In: 80 from 0.0.0.0/0<br>Out: 8000 to app-sg</div></div>
+    <div class="sg-arrow">TCP 8000</div>
+    <div class="sg"><div class="name">app-sg</div><div class="who">EC2 instances (API + worker)</div><div class="rule">In: 8000 from alb-sg<br>Out: all (NAT, endpoints, RDS)</div></div>
+    <div class="sg-arrow">TCP 3306</div>
+    <div class="sg"><div class="name">db-sg</div><div class="who">RDS MySQL</div><div class="rule">In: 3306 from app-sg<br>Out: none</div></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Subnet</th><th>CIDR</th><th>AZ</th><th>Route to internet</th><th>Used by</th></tr></thead>
+      <tbody>
+        <tr><td>public-a</td><td><code>10.0.101.0/24</code></td><td>A</td><td>Internet gateway</td><td>ALB, NAT gateway</td></tr>
+        <tr><td>public-b</td><td><code>10.0.102.0/24</code></td><td>B</td><td>Internet gateway</td><td>ALB</td></tr>
+        <tr><td>app-a</td><td><code>10.0.1.0/24</code></td><td>A</td><td>NAT gateway + S3/DynamoDB endpoints</td><td>Auto Scaling group</td></tr>
+        <tr><td>app-b</td><td><code>10.0.2.0/24</code></td><td>B</td><td>NAT gateway + S3/DynamoDB endpoints</td><td>Auto Scaling group</td></tr>
+        <tr><td>db-a</td><td><code>10.0.11.0/24</code></td><td>A</td><td>none</td><td>RDS instance</td></tr>
+        <tr><td>db-b</td><td><code>10.0.12.0/24</code></td><td>B</td><td>none</td><td>RDS subnet group (required by AWS even for Single-AZ)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="section-intro" style="margin-top:10px">The course illustration shows a single private subnet. An ALB and a multi-AZ Auto Scaling group need two of each, so the layout keeps the illustrated <code>10.0.1.0/24</code> and adds the rest (ADR-004).</p>
+
+  <!-- ============================================================ -->
+  <h2 id="data">6. Data placement</h2>
+  <p class="section-intro">Each store holds the data whose access pattern it fits best. The full reasoning is in <a href="data-justification.md">data-justification.md</a>.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#i-rds"/></svg>RDS MySQL</h3>
+      <ul>
+        <li><code>users</code>: email, Argon2id hash, role</li>
+        <li><code>sessions</code>: SHA-256 of the token, expiry</li>
+        <li><code>schema_migrations</code></li>
+      </ul>
+      <p class="why">Relational, unique email, joins between users and sessions, transactions on login. Small and stable volume.</p>
+    </div>
+    <div class="card">
+      <h3><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#i-ddb"/></svg>DynamoDB</h3>
+      <ul>
+        <li><code>documents</code>: metadata + result; GSI <code>gsi_user_created</code> for history</li>
+        <li><code>jobs</code>: status, lease, attempts; GSI <code>gsi_status_available</code> is the queue</li>
+      </ul>
+      <p class="why">Key-value access, conditional writes for claiming, flexible result shape, on-demand capacity with no servers to size.</p>
+    </div>
+    <div class="card">
+      <h3><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#i-s3"/></svg>S3</h3>
+      <ul>
+        <li><code>uploads</code>: original PDF / PNG / JPEG</li>
+        <li><code>artifacts</code>: release tarballs for user data</li>
+        <li><code>frontend</code>: static site, private behind OAC</li>
+        <li><code>audit-logs</code>: CloudTrail target</li>
+      </ul>
+      <p class="why">Binary objects up to 5 MiB. Created by a CloudFormation stack that Terraform manages (ADR-035).</p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="constraints">7. Sandbox constraints that shaped the design</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Constraint</th><th>Design response</th><th>Reference</th></tr></thead>
+      <tbody>
+        <tr><td>No IAM role creation</td><td>Only the pre-existing SSM instance profile; access granted with resource policies on buckets, tables and topics</td><td>CON-IAM-01, ADR-033</td></tr>
+        <tr><td>No Lambda</td><td>API and worker both run on EC2</td><td>ADR-023</td></tr>
+        <tr><td>No Textract for the instance role</td><td>OCR runs locally with Tesseract</td><td>ADR-012</td></tr>
+        <tr><td>RDS Multi-AZ not available</td><td>Single-AZ RDS, accepted risk</td><td>ADR-003</td></tr>
+        <tr><td>No custom domains or certificates</td><td>Default CloudFront domain for HTTPS; ALB is HTTP only</td><td>CON-DNS-01, ADR-025, ADR-030</td></tr>
+        <tr><td>Shell access only through SSM</td><td>No key pairs, no bastion, no port 22</td><td>CON-EC2-05</td></tr>
+        <tr><td>KMS list access only</td><td>No customer keys; RDS storage not encrypted at rest</td><td>ADR-032</td></tr>
+        <tr><td>Amazon Linux 2023 has no Tesseract package</td><td>Ubuntu 24.04 AMI (owner alias <code>amazon</code>), Tesseract from apt</td><td>ADR-038</td></tr>
+        <tr><td><code>autoscaling:StartInstanceRefresh</code> denied (SCP)</td><td>New releases rolled out by replacing instances one at a time</td><td>ADR-039</td></tr>
+        <tr><td><code>cloudtrail:CreateTrail</code> denied</td><td>Trail module present but disabled by default</td><td>INF-AUD-03</td></tr>
+        <tr><td>Instance quota (course brief: max 4 in the group)</td><td><code>asg_max_size = 4</code>; falls back to 3 if the quota is lower</td><td>INF-ASG-01, open Q-006</td></tr>
+        <tr><td><code>s3:GetBucketObjectLockConfiguration</code> denied, so Terraform's <code>aws_s3_bucket</code> cannot refresh</td><td>Buckets created by a CloudFormation stack; policies stay in Terraform</td><td>ADR-035</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2 id="status">8. Verification status</h2>
+  <p class="section-intro">This page describes the design as coded. What has actually been proven so far:</p>
+  <div class="status">
+    <div class="card">
+      <h3><span class="pill ok">verified locally</span></h3>
+      <ul>
+        <li>End-to-end flow with real Tesseract, SQLite and in-process AWS mocks (<code>make demo</code>)</li>
+        <li>Unit, contract and golden tests (<code>make test</code>)</li>
+        <li>Terraform configuration is valid (<code>make tf-validate</code>)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="pill no">not yet verified in AWS</span></h3>
+      <ul>
+        <li>Healthy ALB targets and scale-out to 4 instances</li>
+        <li>Migrations and TLS against RDS</li>
+        <li>Effective instance-role permissions through resource policies</li>
+        <li>SNS email delivery and alarm actions</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    Sources: <code>specs/01-architecture.md</code>, <code>specs/03-infrastructure.md</code>, <code>specs/05-worker.md</code>, <code>specs/07-data-model.md</code>, <code>infra/terraform/</code>. The Mermaid diagrams in <a href="architecture.md">architecture.md</a> remain the text source of truth (DLV-ARC-01); this page is the visual companion (DLV-ARC-04). Re-check names and addresses against <code>terraform output</code> after each deployment.<br>
+    Icons: AWS Architecture Icons © Amazon Web Services, Inc., embedded from the <code>aws-icons</code> 3.2.0 package and used as AWS permits for architecture diagrams.
+  </footer>
+</main>
+<script>
+(function () {
+  var root = document.documentElement;
+  var btn = document.getElementById("themeToggle");
+  var order = ["auto", "light", "dark"];
+  var current = "auto";
+  try { current = localStorage.getItem("docuprocess-theme") || "auto"; } catch (e) {}
+  function apply(mode) {
+    if (mode === "auto") { root.removeAttribute("data-theme"); } else { root.setAttribute("data-theme", mode); }
+    btn.textContent = "Theme: " + mode;
+  }
+  apply(current);
+  btn.addEventListener("click", function () {
+    current = order[(order.indexOf(current) + 1) % order.length];
+    apply(current);
+    try { localStorage.setItem("docuprocess-theme", current); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

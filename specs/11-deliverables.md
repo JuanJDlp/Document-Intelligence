@@ -15,6 +15,7 @@ These are the course deliverables (brief, section 5). They are written for human
 - **DLV-ARC-01** (active) `docs/architecture.md` contains the reference architecture diagram that matches the deployed topology: two AZs, public and private subnets, the NAT gateway, endpoints, ALB, ASG, CloudFront with the `/api/*` origin, S3, DynamoDB, RDS, SNS, CloudWatch, and CloudTrail. The diagram is source-controlled as Mermaid in the document (and MAY be exported to PNG). It MUST NOT copy the course illustration (see `01` section 4).
 - **DLV-ARC-02** (active) The diagram shows the request flows from `01` section 5 and labels each arrow with the protocol and port.
 - **DLV-ARC-03** (active) `docs/architecture.md` lists the sandbox constraints that shaped the design, referencing `02` section 0 and the table of deviations.
+- **DLV-ARC-04** (active) `docs/architecture.html` is a self-contained visual companion to `docs/architecture.md` for the presentation: topology with AWS Architecture Icons, the upload and processing sequence, the job state machine, instance bootstrap, security groups, and data placement. It loads nothing from the network (icons are inlined as SVG symbols), and it MUST NOT contradict `docs/architecture.md` or `infra/terraform/`. When the topology changes, both files are updated in the same change. Verification: open the file offline in a browser and compare each node and port with `terraform output` and `01` section 5.
 
 ## 3. Data justification (`DLV-DATA-*`)
 
