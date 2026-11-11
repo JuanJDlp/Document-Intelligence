@@ -3,7 +3,7 @@ UV ?= uv
 TF ?= terraform
 VERSION ?= 1.0.0
 TF_DIR := infra/terraform
-.PHONY: setup lint format typecheck test test-ocr samples demo tf-validate tf-plan package package-check smoke bootstrap-artifacts publish deploy deploy-frontend up load destroy check-constraints
+.PHONY: setup lint format typecheck test test-ocr samples demo tf-validate tf-plan package package-check smoke bootstrap-artifacts publish deploy deploy-frontend prepare-state up load destroy check-constraints
 setup:
 	$(UV) sync --locked
 format:
@@ -49,8 +49,11 @@ deploy:
 	$(TF) -chdir=$(TF_DIR) apply .release.tfplan
 deploy-frontend:
 	bash scripts/deploy_frontend.sh
+# Reconciles the local state with a reset lab before deploying (TST-MK-17). Read-only on AWS, except imports into the local state.
+prepare-state:
+	bash scripts/prepare_state.sh
 # One-command deployment from a clean sandbox (TST-MK-15). Requires approval: creates billable resources.
-up: package bootstrap-artifacts publish deploy deploy-frontend
+up: prepare-state package bootstrap-artifacts publish deploy deploy-frontend
 	bash scripts/wait_healthy.sh
 # Traffic simulation for the Auto Scaling demo (TST-MK-16). Requires approval: the ASG may launch instances.
 load:

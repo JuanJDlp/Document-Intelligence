@@ -58,7 +58,7 @@ After sections 1–3 and explicit approval, one command runs sections 4–6 in o
 make up VERSION=1.0.0
 ```
 
-It packages the release, creates the buckets (CloudFormation), uploads the release, applies the full stack with ELB health checks, uploads the frontend, and waits until the target group has the ASG minimum of healthy targets (`scripts/wait_healthy.sh`, 20-minute timeout). It ends by printing the CloudFront URL. Then confirm the SNS emails (section 6) and run the smoke test (section 7). The sections below describe the same steps one by one, for troubleshooting.
+It first reconciles the local Terraform state with the lab (`make prepare-state`, ADR-040): a state left from an earlier lab session is moved aside, and resources that survive a lab reset are imported. Then it packages the release, creates the buckets (CloudFormation), uploads the release, applies the full stack with ELB health checks, uploads the frontend, and waits until the target group has the ASG minimum of healthy targets (`scripts/wait_healthy.sh`, 20-minute timeout). It ends by printing the CloudFront URL. Then confirm the SNS emails (section 6) and run the smoke test (section 7). The sections below describe the same steps one by one, for troubleshooting.
 
 ## 4. Bootstrap buckets and publish the release
 
@@ -158,6 +158,7 @@ This is an explicit database write requiring operator authorization. It does not
 | Job stuck or retried | Inspect its status/available_at/attempts in the jobs table and `sudo journalctl -u docuprocess-worker -n 100 --no-pager`. Expired owners cannot commit results. |
 | SNS email absent | Check subscription confirmation and notification_status. After three failed publication attempts the job remains terminal; it is not processed again. Publication and database commit are not one transaction (ADR-036). |
 | Stale frontend | Re-run the approved frontend deployment/invalidation. Confirm the distribution has finished deploying. |
+| `ParameterAlreadyExists` or `...AlreadyExists` on CloudFront during `make deploy` | A lab reset kept the DB password parameter or a CloudFront policy. Run `make prepare-state` (or `make up`, which runs it first), then deploy again (ADR-040). |
 | AWS AccessDenied | Record the action, service and caller context. Lab-role success does not prove instance-role access. Do not create IAM policies to bypass sandbox restrictions. |
 | CloudTrail denied | Record the exact failure and accepted exception before changing enable_cloudtrail. Refer to previous evidence in specs/answered-questions.md. |
 | UI cannot retain sessionStorage | The page uses per-tab memory navigation. Reloading requires sign-in again. Tokens never use localStorage. |
