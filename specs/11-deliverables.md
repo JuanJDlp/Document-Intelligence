@@ -50,7 +50,22 @@ These are the course deliverables (brief, section 5). They are written for human
 - **DLV-DEMO-01** (active) `docs/demo-script.md` is the script for the live demo: deploy from clean template, upload a document through the browser, watch the job, receive the SNS email, show the DynamoDB item, generate load to show Auto Scaling, show the CloudWatch alarm and the CloudTrail event.
 - **DLV-DEMO-02** (active) The demo script lists the exact commands and the expected output of each step.
 
-## 7. Acceptance
+## 7. Submission package (`DLV-PKG-*`)
+
+The course brief (section 5) and the submission checklist ask for a project plan, the IaC templates, configuration scripts, documentation and a presentation. Code, templates and scripts already live in the repository; the submission folder holds only the three documents that do not exist elsewhere.
+
+- **DLV-PKG-01** (active) `entrega_proyecto_final/` contains exactly three files: `project-plan.md`, `documentation.md` and `presentation.pdf`.
+- **DLV-PKG-02** (active) `project-plan.md` states the team, objectives, scope (in and out), schedule, resources and risks. Dates come from the Git history and the demo date below.
+- **DLV-PKG-03** (active) `documentation.md` is a guide to deploy and operate the infrastructure. It links to `docs/` for detail and does not contradict it.
+- **DLV-PKG-04** (active) `presentation.pdf` explains the solution design, the challenges faced and the lessons learned. It claims as verified only what `docs/`, `skills/aws-sandbox/SKILL.md` or `specs/answered-questions.md` record as observed.
+- **DLV-PKG-05** (active) `README.md` links to the three files.
+- **DLV-PKG-06** (active) The three files are written in Spanish, the language of the course. This is an exception to `AGENTS.md` section 14, requested by the user on 2026-11-13; every other repository artifact stays in English. File names stay in English.
+
+Course facts (answered by the user on 2026-11-13, was Q-012): the team is Juan José De La Pava and Diego Polanco, and the submission and live demonstration took place on 2026-11-13. Evidence: the user's answer in the working session; no repository file recorded it before. Decision: the schedule in `project-plan.md` uses 2026-11-13 for submission and demonstration.
+
+Verification: `ls entrega_proyecto_final` lists the three files; each claim in the presentation is traceable to the repository.
+
+## 8. Acceptance
 
 - **DLV-ACC-01** (active) All files named in sections 1–6 exist and are reviewed against the `TST-E2E-*` checklist results.
 - **DLV-ACC-02** (active) Documents reference requirement IDs where they state a decision or a constraint.

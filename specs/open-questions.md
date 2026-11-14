@@ -15,7 +15,6 @@ Creating a test resource to answer a question needs the user's approval for each
 | ID | Status | Question | Fallback | Blocks |
 |---|---|---|---|---|
 | Q-011 | open | The teammate uses another AI tool. Does it read `AGENTS.md` and `specs/` the same way? | Not blocking. Both tools must follow `AGENTS.md`. | First shared session |
-| Q-012 | open | Course deadlines and the demo date | Not used by any spec. | Schedule only |
 
 ## Notes
 

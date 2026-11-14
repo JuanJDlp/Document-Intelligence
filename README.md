@@ -4,6 +4,18 @@ Asynchronous processing of synthetic receipts and invoices for Infraestructura I
 
 The application includes a FastAPI API, an independent Tesseract extraction engine, a lease-based background worker and a static frontend. The AWS design uses CloudFront/S3, ALB, private EC2 instances in an Auto Scaling Group, RDS MySQL, DynamoDB and SNS. See [architecture](docs/architecture.md) and [data design](docs/data-justification.md).
 
+## Course submission
+
+The documents for the course submission are in [`entrega_proyecto_final/`](entrega_proyecto_final/), written in Spanish (`DLV-PKG-06`). Team: Juan José De La Pava and Diego Polanco.
+
+| File | Contents |
+|---|---|
+| [`project-plan.md`](entrega_proyecto_final/project-plan.md) | Objectives, scope, schedule, resources and risks |
+| [`documentation.md`](entrega_proyecto_final/documentation.md) | How to deploy and operate the infrastructure |
+| [`presentation.pdf`](entrega_proyecto_final/presentation.pdf) | Solution design, challenges faced and lessons learned |
+
+The IaC templates are in `infra/terraform/` (Terraform modules; the bucket CloudFormation template is `infra/terraform/modules/buckets/templates/buckets.yaml`). The configuration scripts are `infra/terraform/templates/userdata.sh.tftpl` and `scripts/`.
+
 ## Run locally
 
 Use Ubuntu 24.04 in WSL, Python 3.12, uv, make, Terraform 1.6+ and Tesseract with Spanish/English language data.
